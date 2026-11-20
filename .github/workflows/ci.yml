@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A newer push to the same branch makes the running check moot.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # The job id is the required status check of the ruleset on main: renaming it means updating the ruleset.
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      # rustup is on GitHub's runners; rust-toolchain.toml names the toolchain and its components.
+      - name: Rust toolchain
+        id: rust
+        shell: pwsh
+        run: |
+          rustup toolchain install
+          "version=$((rustc -V) -replace '[^\w.]+', '-')" >> $env:GITHUB_OUTPUT
+
+      # Keyed on the compiler too: a new stable cannot reuse what an older one compiled.
+      - uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: cargo-${{ runner.os }}-${{ steps.rust.outputs.version }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: cargo-${{ runner.os }}-${{ steps.rust.outputs.version }}-
+
+      # The end-to-end test needs FFmpeg. No GPU on the runner: it encodes with the CPU encoders and the
+      # software filters (libplacebo is used too if the runner's Vulkan driver runs it).
+      - name: FFmpeg
+        shell: pwsh
+        run: choco install ffmpeg --yes --no-progress
+
+      # The same checklist a developer runs: fmt, clippy -D warnings, rustdoc -D warnings, tests,
+      # documentation links, no video or personal path tracked, the release build and its zip. One script,
+      # so CI and a developer's machine cannot drift apart.
+      - name: Test, build and zip
+        shell: pwsh
+        run: .\scripts\build.ps1 release
+
+      - name: Read the version
+        id: version
+        shell: pwsh
+        run: |
+          $version = (Select-String -Path Cargo.toml -Pattern '^version\s*=\s*"([^"]+)"').Matches[0].Groups[1].Value
+          "version=$version" >> $env:GITHUB_OUTPUT
+
+      # GitHub serves every artifact as a zip of its own: level 0 keeps it a plain container around the zip.
+      - uses: actions/upload-artifact@v7
+        with:
+          name: quick-video-transcoder-${{ steps.version.outputs.version }}-windows-x64
+          path: dist/*.zip
+          compression-level: 0
+          if-no-files-found: error

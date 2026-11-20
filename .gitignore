@@ -1,0 +1,22 @@
+/target
+/dist
+**/*.rs.bk
+*.pdb
+
+# Personal, never published: private notes, local config, measurements on real captures.
+*.local
+*.local.*
+/.local/
+/CLAUDE.local.md
+/.claude/settings.local.json
+
+# Videos must never be committed: tests generate synthetic clips at run time.
+*.mp4
+*.mkv
+*.mov
+*.webm
+*.avi
+*.m4v
+*.ts
+*.m2ts
+*.qvt-partial

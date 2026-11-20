@@ -1,0 +1,83 @@
+name: Release
+
+# A tag alone produces the release: push vX.Y.Z and this runs the same checklist a developer runs, builds
+# the zip from that exact commit, attests it, and publishes it with its checksum. Nothing is built or
+# uploaded by hand.
+
+on:
+  push:
+    tags: ['v*']
+
+# Publishing, and the attestation: the OIDC token signs it, the others store it with the files it vouches
+# for.
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+  artifact-metadata: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      # No cache: a release builds from nothing.
+      - name: Rust toolchain
+        shell: pwsh
+        run: rustup toolchain install
+
+      - name: FFmpeg
+        shell: pwsh
+        run: choco install ffmpeg --yes --no-progress
+
+      # The version is bumped in the release commit, so the tag and Cargo.toml must agree.
+      - name: The tag names the version in Cargo.toml
+        shell: pwsh
+        run: |
+          $version = (Select-String -Path Cargo.toml -Pattern '^version\s*=\s*"([^"]+)"').Matches[0].Groups[1].Value
+          if ($env:GITHUB_REF_NAME -ne "v$version") {
+            throw "tag $env:GITHUB_REF_NAME does not match Cargo.toml version $version"
+          }
+          "QVT_VERSION=$version" | Add-Content $env:GITHUB_ENV
+
+      - name: Test, build and zip
+        shell: pwsh
+        run: .\scripts\build.ps1 release
+
+      # The section of the changelog for this version is the release's notes; no section, no release.
+      - name: Checksum and notes
+        shell: pwsh
+        run: |
+          $zip = "dist\quick-video-transcoder-$env:QVT_VERSION-windows-x64.zip"
+          $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  $(Split-Path -Leaf $zip)" | Set-Content -NoNewline -Encoding ascii dist\SHA256SUMS.txt
+          $changelog = Get-Content CHANGELOG.md -Raw
+          $pattern = "(?ms)^## \[$([regex]::Escape($env:QVT_VERSION))\] - \d{4}-\d{2}-\d{2}\s*$(.*?)(?=^## \[|\z)"
+          $match = [regex]::Match($changelog, $pattern)
+          if (-not $match.Success) { throw "CHANGELOG.md has no dated section for $env:QVT_VERSION" }
+          $match.Groups[1].Value.Trim() | Set-Content -Encoding utf8 dist\notes.md
+
+      - name: Attest the release files
+        uses: actions/attest@v4
+        with:
+          subject-checksums: dist/SHA256SUMS.txt
+
+      - name: Publish
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create $env:GITHUB_REF_NAME `
+            "dist\quick-video-transcoder-$env:QVT_VERSION-windows-x64.zip" `
+            dist\SHA256SUMS.txt `
+            --title "Quick Video Transcoder $env:QVT_VERSION" `
+            --notes-file dist\notes.md `
+            --verify-tag

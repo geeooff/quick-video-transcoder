@@ -1,0 +1,26 @@
+# Crates and actions kept current, weekly. Crate patches come grouped in one pull request;
+# dependabot-automerge.yml merges the crate updates Cargo calls compatible once CI passes, and everything
+# else waits for the maintainer.
+version: 2
+updates:
+  - package-ecosystem: cargo
+    directory: /
+    schedule:
+      interval: weekly
+    # A fresh release waits a week: a broken or compromised crate is usually yanked by then.
+    cooldown:
+      default-days: 7
+    groups:
+      patches:
+        update-types: [patch]
+    commit-message:
+      prefix: deps
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: ci
