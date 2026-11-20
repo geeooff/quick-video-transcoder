@@ -1,5 +1,5 @@
-//! Decodes the sound of a video to interleaved stereo `f32` samples through an `ffmpeg` sub-process, with
-//! the audio choice of the video's profile (one track, or every track mixed).
+//! Decodes the sound of a video to interleaved stereo `f32` samples through an `ffmpeg` sub-process, and
+//! maps the chosen audio streams for the encode: the preview plays exactly what the encode keeps.
 
 use std::io::{ErrorKind, Read};
 use std::path::Path;
@@ -9,47 +9,44 @@ use std::thread::JoinHandle;
 use anyhow::{Context, Result};
 
 use super::{StderrTail, base_args, tool};
-use crate::profile::AudioChoice;
 
 /// Channels of the decoded audio (the output is stereo too).
 pub const CHANNELS: usize = 2;
 
-/// `ffmpeg` arguments decoding the chosen sound of a video with `tracks` audio streams from `start`
-/// seconds at `rate` Hz. `None` when there is nothing to play.
-pub fn audio_args(
-    path: &Path,
-    tracks: usize,
-    choice: AudioChoice,
-    start: f64,
-    rate: u32,
-) -> Option<Vec<String>> {
+/// The options taking `tracks` (indexes among the audio streams, from
+/// [`crate::profile::AudioChoice::tracks`]) of input 0: `-an` for none, a `-map` for one, a mix of
+/// several (game and microphone) with a limiter so the sum does not clip.
+pub fn map_args(tracks: &[usize]) -> Vec<String> {
+    match tracks {
+        [] => vec!["-an".to_owned()],
+        [track] => vec!["-map".to_owned(), format!("0:a:{track}")],
+        _ => {
+            let inputs: String = tracks.iter().map(|i| format!("[0:a:{i}]")).collect();
+            vec![
+                "-filter_complex".to_owned(),
+                format!(
+                    "{inputs}amix=inputs={}:duration=first:normalize=0,alimiter=limit=0.97[mix]",
+                    tracks.len()
+                ),
+                "-map".to_owned(),
+                "[mix]".to_owned(),
+            ]
+        }
+    }
+}
+
+/// `ffmpeg` arguments decoding `tracks` of a video from `start` seconds at `rate` Hz. `None` when there
+/// is nothing to play.
+pub fn audio_args(path: &Path, tracks: &[usize], start: f64, rate: u32) -> Option<Vec<String>> {
+    if tracks.is_empty() {
+        return None;
+    }
     let mut args = base_args();
     if start > 0.0 {
         args.extend(["-ss".to_owned(), crate::timecode::arg(start)]);
     }
     args.extend(["-i".to_owned(), path.to_string_lossy().into_owned()]);
-    match choice {
-        AudioChoice::None => return None,
-        AudioChoice::MixAll if tracks > 1 => {
-            let inputs: String = (0..tracks).map(|i| format!("[0:a:{i}]")).collect();
-            args.extend([
-                "-filter_complex".to_owned(),
-                format!("{inputs}amix=inputs={tracks}:duration=first:normalize=0,alimiter=limit=0.97[mix]"),
-                "-map".to_owned(),
-                "[mix]".to_owned(),
-            ]);
-        }
-        AudioChoice::Track(index) if index < tracks => {
-            args.extend(["-map".to_owned(), format!("0:a:{index}")]);
-        }
-        AudioChoice::Track(_) => return None,
-        AudioChoice::First | AudioChoice::MixAll => {
-            if tracks == 0 {
-                return None;
-            }
-            args.extend(["-map", "0:a:0"].map(String::from));
-        }
-    }
+    args.extend(map_args(tracks));
     args.extend(["-vn", "-sn", "-dn", "-ac"].map(String::from));
     args.push(CHANNELS.to_string());
     args.extend(["-ar".to_owned(), rate.to_string()]);
@@ -144,21 +141,16 @@ mod tests {
     #[test]
     fn decodes_the_chosen_sound() {
         let path = Path::new("in.mp4");
-        let first = audio_args(path, 2, AudioChoice::First, 12.5, 48000)
-            .unwrap()
-            .join(" ");
+        let one = audio_args(path, &[1], 12.5, 48000).unwrap().join(" ");
         assert_eq!(
-            first,
+            one,
             "-hide_banner -nostdin -loglevel error -ss 12.500 -i in.mp4 \
-             -map 0:a:0 -vn -sn -dn -ac 2 -ar 48000 -f f32le pipe:1"
+             -map 0:a:1 -vn -sn -dn -ac 2 -ar 48000 -f f32le pipe:1"
         );
-        let mix = audio_args(path, 2, AudioChoice::MixAll, 0.0, 44100)
-            .unwrap()
-            .join(" ");
+        let mix = audio_args(path, &[0, 1], 0.0, 44100).unwrap().join(" ");
         assert!(mix.contains("[0:a:0][0:a:1]amix=inputs=2"), "{mix}");
         assert!(!mix.contains("-ss"));
-        assert_eq!(audio_args(path, 0, AudioChoice::First, 0.0, 48000), None);
-        assert_eq!(audio_args(path, 2, AudioChoice::Track(3), 0.0, 48000), None);
-        assert_eq!(audio_args(path, 2, AudioChoice::None, 0.0, 48000), None);
+        assert_eq!(audio_args(path, &[], 0.0, 48000), None);
+        assert_eq!(map_args(&[]), ["-an"]);
     }
 }

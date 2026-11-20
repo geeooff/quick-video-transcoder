@@ -13,17 +13,15 @@ use crate::audio::AudioOutput;
 use crate::ffmpeg::audio::audio_args;
 use crate::ffmpeg::decoder::{DecodeConfig, Frame, FrameStream, StreamEvent};
 use crate::ffmpeg::filters::Engine;
-use crate::profile::AudioChoice;
 
 /// The sound to play with a video.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct AudioSource {
     /// Source file.
     pub path: PathBuf,
-    /// Audio streams in the file.
-    pub tracks: usize,
-    /// Which ones to play.
-    pub choice: AudioChoice,
+    /// The audio streams to play (mixed when several), from
+    /// [`AudioChoice::tracks`](crate::profile::AudioChoice::tracks).
+    pub tracks: Vec<usize>,
 }
 
 /// Plays one video. Call [`Player::poll`] every UI frame and display what it returns.
@@ -207,7 +205,7 @@ impl Player {
         let args = self
             .audio_source
             .as_ref()
-            .and_then(|a| audio_args(&a.path, a.tracks, a.choice, start, output.rate()));
+            .and_then(|a| audio_args(&a.path, &a.tracks, start, output.rate()));
         match args {
             Some(args) => {
                 if let Err(error) = output.start(args, start) {

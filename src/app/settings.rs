@@ -7,6 +7,7 @@ use super::TranscoderApp;
 use super::queue_panel::{GOOD, WARN};
 use crate::estimate::{Verdict, quality_word};
 use crate::ffmpeg::encoders::{EncoderBackend, VideoCodec};
+use crate::ffmpeg::probe::game_track;
 use crate::plan;
 use crate::profile::{AudioChoice, Profile, ToneMapping};
 use crate::queue::JobId;
@@ -257,11 +258,15 @@ impl TranscoderApp {
                 ui.label("Sound");
                 egui::ComboBox::from_id_salt("audio")
                     .selected_text(audio_label(after.audio, media.as_ref()))
+                    .width(220.0)
                     .show_ui(ui, |ui| {
-                        ui.selectable_value(&mut after.audio, AudioChoice::First, "First track");
-                        if let Some(media) = &media
-                            && media.audio.len() > 1
-                        {
+                        ui.selectable_value(
+                            &mut after.audio,
+                            AudioChoice::Auto,
+                            audio_label(AudioChoice::Auto, media.as_ref()),
+                        )
+                        .on_hover_text("The game's track: the first one whose name is not a microphone or a voice chat");
+                        if let Some(media) = &media {
                             for track in &media.audio {
                                 let choice = AudioChoice::Track(track.index);
                                 ui.selectable_value(
@@ -693,16 +698,18 @@ impl TranscoderApp {
 
 /// How an audio choice reads for a video.
 fn audio_label(choice: AudioChoice, media: Option<&crate::ffmpeg::probe::MediaInfo>) -> String {
+    let audio = media.map_or(&[][..], |m| &m.audio[..]);
     match choice {
-        AudioChoice::First => "First track".to_owned(),
-        AudioChoice::Track(index) => {
-            let title = media
-                .and_then(|m| m.audio.get(index))
-                .and_then(|t| t.title.clone())
-                .map(|t| format!(" ({t})"))
-                .unwrap_or_default();
-            format!("Track {}{title}", index + 1)
-        }
+        AudioChoice::Auto => match game_track(audio).and_then(|i| audio.get(i)) {
+            Some(track) => match &track.title {
+                Some(title) => format!("Automatic: {title}"),
+                None => format!("Automatic: track {}", track.index + 1),
+            },
+            None => "Automatic (the game's track)".to_owned(),
+        },
+        AudioChoice::Track(index) => audio
+            .get(index)
+            .map_or_else(|| format!("Track {}", index + 1), |t| t.label()),
         AudioChoice::MixAll => "Every track mixed".to_owned(),
         AudioChoice::None => "No sound".to_owned(),
     }

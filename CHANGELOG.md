@@ -20,6 +20,9 @@ refuses a tag without one.
 - Output profiles in `profiles.toml`, with a built-in *Messenger* profile (720p, 30 fps, H.265, under
   25 MB). Settings can be changed on several selected videos at once and saved as a profile.
 - HDR to SDR tone mapping on the GPU with libplacebo, and the CPU filters when it is not available.
+- The sound is the game's track by default, not the microphone: the first track whose name is not a
+  microphone or a voice chat. The *Sound* menu lists each track with its name, as players show it
+  ("System sounds", "Microphone"), and offers every track mixed or no sound.
 - Two encodes at a time on the GPU, with a size check that re-encodes slightly lower if a file comes out
   over the limit.
 - *Copy* puts encoded files on the clipboard, ready to paste into a conversation; *Show* opens their
