@@ -19,7 +19,6 @@ use crate::ffmpeg::filters::{self, GraphSpec, Sink};
 use crate::ffmpeg::{StderrTail, base_args, kill_tree, tool};
 use crate::naming::{check_partial, partial_path};
 use crate::plan;
-use crate::profile::AudioChoice;
 use crate::timecode;
 
 /// Re-encodes allowed when the file comes out larger than the limit.
@@ -87,35 +86,17 @@ pub fn encode_args(
         "-vf".to_owned(),
         graph.filter,
     ]);
-    let tracks = request.media.audio.len();
     let audio = plan::audio_kbps(&request.media, &request.profile);
-    match (request.profile.audio, audio) {
-        (_, None) | (AudioChoice::None, _) => args.push("-an".to_owned()),
-        (AudioChoice::MixAll, Some(_)) if tracks > 1 => {
-            let inputs: String = (0..tracks).map(|i| format!("[0:a:{i}]")).collect();
-            args.extend([
-                "-filter_complex".to_owned(),
-                format!("{inputs}amix=inputs={tracks}:duration=first:normalize=0,alimiter=limit=0.97[mix]"),
-                "-map".to_owned(),
-                "[mix]".to_owned(),
-            ]);
-        }
-        (AudioChoice::Track(index), Some(_)) => {
-            args.extend(["-map".to_owned(), format!("0:a:{index}")]);
-        }
-        (AudioChoice::First | AudioChoice::MixAll, Some(_)) => {
-            args.extend(["-map", "0:a:0"].map(String::from));
-        }
-    }
+    args.extend(crate::ffmpeg::audio::map_args(
+        &request.profile.audio.tracks(&request.media.audio),
+    ));
     args.extend(
         request
             .encoder
             .bitrate_args(video_bps, plan::gop(target.rate), color.depth()),
     );
     args.extend(color.tag_args());
-    if let Some(kbps) = audio
-        && request.profile.audio != AudioChoice::None
-    {
+    if let Some(kbps) = audio {
         args.extend([
             "-c:a".to_owned(),
             "aac".to_owned(),
@@ -321,6 +302,7 @@ mod tests {
     use crate::ffmpeg::filters::Engine;
     use crate::ffmpeg::probe::parse_probe_json;
     use crate::plan::{FrameRate, Size, Target};
+    use crate::profile::AudioChoice;
     use crate::profile::Profile;
 
     fn request(audio: AudioChoice) -> EstimateRequest {
@@ -364,7 +346,7 @@ mod tests {
     #[test]
     fn writes_the_trimmed_range_with_tags_and_without_metadata() {
         let args = encode_args(
-            &request(AudioChoice::First),
+            &request(AudioChoice::Auto),
             &ESTIMATE,
             3e6,
             Path::new("o.mp4.qvt-partial"),

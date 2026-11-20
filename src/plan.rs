@@ -11,7 +11,7 @@
 use std::fmt;
 
 use crate::ffmpeg::probe::MediaInfo;
-use crate::profile::{AudioChoice, Profile};
+use crate::profile::Profile;
 
 /// A frame rate as FFmpeg writes it: a fraction.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -225,12 +225,7 @@ pub fn video_budget(max_bytes: u64, duration: f64, audio_kbps: Option<u32>) -> O
 
 /// The audio bitrate an output will have, `None` without sound.
 pub fn audio_kbps(media: &MediaInfo, profile: &Profile) -> Option<u32> {
-    let has_audio = match profile.audio {
-        AudioChoice::None => false,
-        AudioChoice::Track(index) => index < media.audio.len(),
-        AudioChoice::First | AudioChoice::MixAll => !media.audio.is_empty(),
-    };
-    has_audio.then_some(profile.audio_bitrate_kbps)
+    (!profile.audio.tracks(&media.audio).is_empty()).then_some(profile.audio_bitrate_kbps)
 }
 
 /// The predicted size of an output: video at `video_bps` plus audio and container.

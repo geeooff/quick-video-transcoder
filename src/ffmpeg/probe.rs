@@ -49,8 +49,54 @@ pub struct AudioTrack {
     pub codec: String,
     /// Channel count.
     pub channels: u32,
-    /// Title or language tag, when the file has one.
+    /// The track's description, when the file has one ("System sounds", "Microphone").
     pub title: Option<String>,
+}
+
+impl AudioTrack {
+    /// `true` when the description names a microphone or a voice chat rather than the game.
+    pub fn is_voice(&self) -> bool {
+        self.title.as_deref().is_some_and(|title| {
+            let title = title.to_lowercase();
+            [
+                "mic",
+                "voice",
+                "chat",
+                "commentary",
+                "comment",
+                "narration",
+                "party",
+            ]
+            .iter()
+            .any(|word| title.contains(word))
+        })
+    }
+
+    /// How the track reads in a menu: `2 · Microphone (AAC, stereo)`.
+    pub fn label(&self) -> String {
+        let layout = match self.channels {
+            1 => "mono".to_owned(),
+            2 => "stereo".to_owned(),
+            6 => "5.1".to_owned(),
+            8 => "7.1".to_owned(),
+            n => format!("{n} channels"),
+        };
+        let details = format!("{}, {layout}", codec_label(&self.codec));
+        match &self.title {
+            Some(title) => format!("{} · {title} ({details})", self.index + 1),
+            None => format!("{} · {details}", self.index + 1),
+        }
+    }
+}
+
+/// The track that carries the game: the first one whose description does not name a microphone or a
+/// voice chat, else the first one. `None` without audio.
+pub fn game_track(audio: &[AudioTrack]) -> Option<usize> {
+    audio
+        .iter()
+        .find(|t| !t.is_voice())
+        .or(audio.first())
+        .map(|t| t.index)
 }
 
 /// What the application needs to know about a source video.
@@ -170,6 +216,24 @@ impl ProbeStream {
             .map(|(_, value)| value.clone())
             .filter(|value| !value.trim().is_empty())
     }
+
+    /// The description of a track, as players show it: the `title` tag (Matroska), the MP4 `name` tag
+    /// (NVIDIA app writes "System sounds" and "Microphone" there), or a handler name that is not one of
+    /// the generic ones muxers write ("SoundHandler", "SoundHandle").
+    fn track_name(&self) -> Option<String> {
+        self.tag("title").or_else(|| self.tag("name")).or_else(|| {
+            self.tag("handler_name").filter(|h| {
+                let generic = h.trim().to_ascii_lowercase();
+                !matches!(
+                    generic.as_str(),
+                    "soundhandler"
+                        | "soundhandle"
+                        | "core media audio"
+                        | "isomedia file produced by google"
+                ) && !generic.starts_with("sound handler")
+            })
+        })
+    }
 }
 
 #[derive(Deserialize)]
@@ -239,7 +303,7 @@ pub fn parse_probe_json(json: &str) -> Result<MediaInfo> {
             index,
             codec: s.codec_name.clone().unwrap_or_default(),
             channels: s.channels.unwrap_or(2),
-            title: s.tag("title").or_else(|| s.tag("handler_name")),
+            title: s.track_name(),
         })
         .collect();
     Ok(MediaInfo {
@@ -336,6 +400,29 @@ mod tests {
         assert!(info.untagged);
         assert!(!parse_probe_json(HDR_CAPTURE).unwrap().untagged);
         assert!((info.duration - 59.178563).abs() < 1e-9);
+    }
+
+    #[test]
+    fn names_the_tracks_and_finds_the_game_one() {
+        // NVIDIA app: the description is the MP4 `name` tag, the handler name is generic. Here the
+        // microphone comes first, to check the game track is found by its name, not its place.
+        let json = r#"{"streams": [
+            {"codec_type": "video", "width": 10, "height": 10},
+            {"codec_type": "audio", "codec_name": "aac", "channels": 2,
+             "tags": {"handler_name": "SoundHandle", "name": "Microphone"}},
+            {"codec_type": "audio", "codec_name": "aac", "channels": 2,
+             "tags": {"handler_name": "SoundHandle", "name": "System sounds"}},
+            {"codec_type": "audio", "codec_name": "opus", "channels": 6,
+             "tags": {"handler_name": "SoundHandler"}}]}"#;
+        let info = parse_probe_json(json).unwrap();
+        let titles: Vec<Option<&str>> = info.audio.iter().map(|t| t.title.as_deref()).collect();
+        assert_eq!(titles, [Some("Microphone"), Some("System sounds"), None]);
+        assert_eq!(game_track(&info.audio), Some(1));
+        assert_eq!(info.audio[0].label(), "1 · Microphone (AAC, stereo)");
+        assert_eq!(info.audio[2].label(), "3 · OPUS, 5.1");
+        // Nothing named: the first track.
+        assert_eq!(game_track(&info.audio[2..]), Some(2));
+        assert_eq!(game_track(&[]), None);
     }
 
     #[test]

@@ -29,7 +29,7 @@ use crate::ffmpeg::encoders::EncoderBackend;
 use crate::ffmpeg::hardware::Capabilities;
 use crate::plan;
 use crate::player::{AudioSource, Player};
-use crate::profile::{self, AudioChoice, ProfileSet};
+use crate::profile::{self, ProfileSet};
 use crate::queue::{JobId, Phase, Queue, QueueSettings};
 use crate::thumbnails::{self, StripRequest, Thumbnail};
 
@@ -425,14 +425,11 @@ impl TranscoderApp {
             Some(Ok(estimate)) => estimate.target,
             _ => plan::best_target(&media, &job.profile),
         };
-        let audio =
-            (!media.audio.is_empty() && job.profile.audio != AudioChoice::None).then(|| {
-                AudioSource {
-                    path: job.path.clone(),
-                    tracks: media.audio.len(),
-                    choice: job.profile.audio,
-                }
-            });
+        let tracks = job.profile.audio.tracks(&media.audio);
+        let audio = (!tracks.is_empty()).then(|| AudioSource {
+            path: job.path.clone(),
+            tracks,
+        });
         let config = DecodeConfig {
             path: job.path.clone(),
             media,

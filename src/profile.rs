@@ -11,6 +11,7 @@ use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
 use crate::ffmpeg::encoders::VideoCodec;
+use crate::ffmpeg::probe::{AudioTrack, game_track};
 
 /// The libplacebo tone-mapping curve used to turn HDR into SDR.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -74,15 +75,34 @@ impl ToneMapping {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case", tag = "kind", content = "track")]
 pub enum AudioChoice {
-    /// The first audio stream (the game, and the microphone when it is mixed in).
+    /// The game's track: the first whose description does not name a microphone or a voice chat
+    /// ([`crate::ffmpeg::probe::game_track`]). Written `first` by version 0.1 profiles.
     #[default]
-    First,
+    #[serde(alias = "first")]
+    Auto,
     /// One stream by its index among the audio streams.
     Track(usize),
     /// Every audio stream mixed together (game and a separate microphone track).
     MixAll,
     /// No sound.
     None,
+}
+
+impl AudioChoice {
+    /// The audio streams (indexes among the audio streams) this choice takes from a video's tracks:
+    /// one, all of them mixed, or none.
+    pub fn tracks(self, audio: &[AudioTrack]) -> Vec<usize> {
+        match self {
+            Self::Auto => game_track(audio).into_iter().collect(),
+            Self::Track(index) => audio
+                .iter()
+                .filter(|t| t.index == index)
+                .map(|t| t.index)
+                .collect(),
+            Self::MixAll => audio.iter().map(|t| t.index).collect(),
+            Self::None => Vec::new(),
+        }
+    }
 }
 
 /// A destination's limits and the encoding choices made for it.
@@ -144,7 +164,7 @@ impl Profile {
             sdr_only: true,
             tone_mapping: ToneMapping::Auto,
             audio_bitrate_kbps: 128,
-            audio: AudioChoice::First,
+            audio: AudioChoice::Auto,
             quality_ceiling: 20,
             quality_floor: 32,
         }
@@ -292,6 +312,11 @@ mod tests {
         assert_eq!(discord.max_bytes(), 10_000_000);
         assert_eq!(discord.max_short_side, 720);
         assert_eq!(discord.audio, AudioChoice::MixAll);
+        // Version 0.1 wrote the game track choice as `first`.
+        let old =
+            ProfileSet::parse("[[profile]]\nname = \"Old\"\n[profile.audio]\nkind = \"first\"\n")
+                .unwrap();
+        assert_eq!(old.profiles[0].audio, AudioChoice::Auto);
         assert_eq!(ProfileSet::parse("").unwrap(), ProfileSet::default());
     }
 

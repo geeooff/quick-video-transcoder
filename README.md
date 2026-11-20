@@ -79,12 +79,13 @@ quality_ceiling = 20
 quality_floor = 32
 
 [profile.audio]
-kind = "first"
+kind = "auto"
 ```
 
 Sizes are megabytes of 1,000,000 bytes. Qualities are H.265 QPs, lower is better: `quality_ceiling` is the
 best quality worth its bytes, `quality_floor` the worst accepted before lowering the frame rate or the
-resolution. `audio` is `first`, `mix-all`, `none`, or `{ kind = "track", track = 1 }`.
+resolution. `audio` is `auto` (the game's track, not the microphone), `mix-all`, `none`, or
+`{ kind = "track", track = 1 }` (tracks count from 0).
 
 Does Messenger keep 1080p60, or re-encode AV1? Meta does not say: see [Messenger's limits](docs/messenger.md)
 for what is documented and how to measure it.
