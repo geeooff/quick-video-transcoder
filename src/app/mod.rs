@@ -929,6 +929,8 @@ fn reveal(dir: &Path, file: Option<&Path>) {
 impl eframe::App for TranscoderApp {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
+        // egui's debug style only exists in debug builds.
+        #[cfg(debug_assertions)]
         if std::env::var_os("QVT_DEBUG_HITS").is_some() {
             ctx.global_style_mut(|s| s.debug.show_widget_hits = true);
             if ctx.input(|i| i.pointer.any_pressed())

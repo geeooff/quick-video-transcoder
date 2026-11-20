@@ -96,6 +96,6 @@ tests/pipeline.rs   end to end on synthetic clips          examples/transcode.rs
   `selectable_labels` is off for the whole window.
 - Driving the window with computer-use: the Claude desktop app's own window may cover part of the screen.
   It is hidden in screenshots but still takes the clicks; check with `WindowFromPoint` before suspecting
-  the UI, and move the window into the free area. `QVT_DEBUG_HITS=1` draws the widget under the pointer
+  the UI, and move the window into the free area. `QVT_DEBUG_HITS=1` (debug builds) draws the widget under the pointer
   and logs each press with the layer it lands on. Drags need a press, several moves and a release, each a
   separate action: one quick drag reads as a click.
