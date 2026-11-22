@@ -827,28 +827,6 @@ impl TranscoderApp {
         let Some((path, idle_since)) = &mut self.screenshot else {
             return;
         };
-        let images: Vec<Arc<egui::ColorImage>> = ctx.input(|i| {
-            i.raw
-                .events
-                .iter()
-                .filter_map(|e| match e {
-                    egui::Event::Screenshot { image, .. } => Some(Arc::clone(image)),
-                    _ => None,
-                })
-                .collect()
-        });
-        if let Some(image) = images.first() {
-            let [width, height] = image.size;
-            let mut ppm = format!("P6\n{width} {height}\n255\n").into_bytes();
-            for pixel in &image.pixels {
-                ppm.extend_from_slice(&[pixel.r(), pixel.g(), pixel.b()]);
-            }
-            if let Err(error) = std::fs::write(&*path, ppm) {
-                log::error!("cannot save the screenshot: {error}");
-            }
-            ctx.send_viewport_cmd(egui::ViewportCommand::Close);
-            return;
-        }
         let busy = self.detection.is_some()
             || self.frame_texture.is_none()
             || self.queue.jobs.iter().any(|j| {
@@ -862,7 +840,22 @@ impl TranscoderApp {
             (true, _) => *idle_since = None,
             (false, None) => *idle_since = Some(std::time::Instant::now()),
             (false, Some(since)) if since.elapsed() > Duration::from_secs(2) => {
-                ctx.send_viewport_cmd(egui::ViewportCommand::Screenshot(egui::UserData::default()));
+                let path = path.clone();
+                let close = ctx.clone();
+                ctx.request_screenshot(move |image| {
+                    let [width, height] = image.size;
+                    let mut ppm = format!("P6\n{width} {height}\n255\n").into_bytes();
+                    for pixel in &image.pixels {
+                        ppm.extend_from_slice(&[pixel.r(), pixel.g(), pixel.b()]);
+                    }
+                    if let Err(error) = std::fs::write(&path, ppm) {
+                        log::error!("cannot save the screenshot: {error}");
+                    }
+                    close.send_viewport_cmd(egui::ViewportCommand::Close);
+                    close.request_repaint();
+                });
+                // Asked once: the callback closes the window.
+                self.screenshot = None;
             }
             _ => {}
         }

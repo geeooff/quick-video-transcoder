@@ -96,13 +96,8 @@ impl TranscoderApp {
             {
                 self.set_trim_end(self.player.position());
             }
-            ui.label(
-                egui::RichText::new(format!(
-                    "kept {}",
-                    timecode::format_short(trim.duration(), true)
-                ))
-                .color(ACCENT),
-            );
+            // The kept duration is shown in the settings panel and the queue row: here it collided with the
+            // volume slider once egui 0.37 drew the transport symbols as wider color emoji.
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 ui.spacing_mut().slider_width = 90.0;
                 let available = self.player.has_audio();
@@ -177,8 +172,12 @@ impl TranscoderApp {
         };
         let start_rect = handle(x_of(trim.start));
         let end_rect = handle(x_of(trim.end));
-        let start = ui.interact(start_rect, ui.id().with(("trim start", id)), Sense::drag());
-        let end = ui.interact(end_rect, ui.id().with(("trim end", id)), Sense::drag());
+        let start = ui.interact(
+            start_rect,
+            egui::Id::unique(("trim start", id)),
+            Sense::drag(),
+        );
+        let end = ui.interact(end_rect, egui::Id::unique(("trim end", id)), Sense::drag());
         for (r, resp) in [(start_rect, &start), (end_rect, &end)] {
             let active = resp.hovered() || resp.dragged();
             let fill = if active { Color32::WHITE } else { ACCENT };
