@@ -3,8 +3,8 @@ name = "quick-video-transcoder"
 version = "0.1.0"
 authors = ["Geoffrey Vancoetsem"]
 edition = "2024"
-# Let chains, stable since 1.88.
-rust-version = "1.88"
+# egui 0.37 needs Rust 1.95.
+rust-version = "1.95"
 description = "Queue game captures, trim them on a timeline and re-encode each one to fit a size-limited destination such as Messenger, with HDR to SDR tone mapping."
 license = "MIT"
 repository = "https://github.com/Geeooff/quick-video-transcoder"
@@ -22,7 +22,7 @@ path = "src/main.rs"
 anyhow = "1.0.104"
 cpal = "0.18.2"
 crossbeam-channel = "0.5.17"
-eframe = { version = "0.36.2", features = ["persistence"] }
+eframe = { version = "0.37.0", features = ["persistence"] }
 env_logger = "0.11.11"
 log = "0.4.34"
 rfd = "0.17.2"

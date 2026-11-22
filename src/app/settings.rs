@@ -407,10 +407,10 @@ impl TranscoderApp {
         }
         let trim = job.trim;
         let mut start_text = ui
-            .data(|d| d.get_temp::<String>(egui::Id::new(("trim start", focus))))
+            .data(|d| d.get_temp::<String>(egui::Id::unique(("trim start", focus))))
             .unwrap_or_default();
         let mut end_text = ui
-            .data(|d| d.get_temp::<String>(egui::Id::new(("trim end", focus))))
+            .data(|d| d.get_temp::<String>(egui::Id::unique(("trim end", focus))))
             .unwrap_or_default();
         let mut start_edit = TimeEdit::Unchanged;
         let mut end_edit = TimeEdit::Unchanged;
@@ -433,8 +433,8 @@ impl TranscoderApp {
                 ui.end_row();
             });
         ui.data_mut(|d| {
-            d.insert_temp(egui::Id::new(("trim start", focus)), start_text);
-            d.insert_temp(egui::Id::new(("trim end", focus)), end_text);
+            d.insert_temp(egui::Id::unique(("trim start", focus)), start_text);
+            d.insert_temp(egui::Id::unique(("trim end", focus)), end_text);
         });
         let reset = ui
             .add_enabled(

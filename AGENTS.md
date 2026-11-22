@@ -1,6 +1,6 @@
 # Working in this repository
 
-**quick-video-transcoder**: a Rust (eframe/egui 0.36, wgpu) Windows application that queues game captures,
+**quick-video-transcoder**: a Rust (eframe/egui 0.37, wgpu) Windows application that queues game captures,
 trims them on a timeline and re-encodes each to fit a size-limited destination (Messenger by default)
 through the FFmpeg command line tools. Public repository: no personal data.
 
