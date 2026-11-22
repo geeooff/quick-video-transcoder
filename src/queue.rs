@@ -230,6 +230,7 @@ pub struct Queue {
     /// Queue settings.
     pub settings: QueueSettings,
     notify: Arc<dyn Fn() + Send + Sync>,
+    paused: bool,
 }
 
 impl Queue {
@@ -250,15 +251,20 @@ impl Queue {
             capabilities,
             settings,
             notify,
+            paused: false,
         }
     }
 
     /// Applies new settings.
     pub fn set_settings(&mut self, settings: QueueSettings) {
         self.encode_slots.set_capacity(settings.parallel_encodes);
+        // Only the encoder changes what an estimate says: the output folder and the encodes at once do not.
+        let encoder_changed = settings.backend != self.settings.backend;
         self.settings = settings;
-        for job in &mut self.jobs {
-            job.touch();
+        if encoder_changed {
+            for job in &mut self.jobs {
+                job.touch();
+            }
         }
     }
 
@@ -377,9 +383,17 @@ impl Queue {
         while let Ok(event) = self.receiver.try_recv() {
             self.apply(event, &mut log);
         }
-        self.start_estimates();
-        self.start_encodes(&mut log);
+        if !self.paused {
+            self.start_estimates();
+            self.start_encodes(&mut log);
+        }
         log
+    }
+
+    /// Holds back new estimates and encodes (the work already running goes on), while the encoder's
+    /// parallelism is measured: they would share the encoder with the measurement and skew it.
+    pub fn set_paused(&mut self, paused: bool) {
+        self.paused = paused;
     }
 
     fn apply(&mut self, event: Event, log: &mut Vec<(bool, String)>) {

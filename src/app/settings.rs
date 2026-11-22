@@ -611,10 +611,47 @@ impl TranscoderApp {
                     });
                 ui.end_row();
                 ui.label("Encodes at once");
-                ui.add(egui::Slider::new(&mut settings.parallel_encodes, 1..=6))
-                    .on_hover_text(
-                        "Two saturate an RTX 4090's two NVENC engines; more only queue up",
-                    );
+                let measured = self.prefs.measured_parallel.as_ref().map(|(_, n)| *n);
+                let slider = ui
+                    .add(egui::Slider::new(&mut settings.parallel_encodes, 1..=6))
+                    .on_hover_text(match measured {
+                        Some(n) => format!(
+                            "Measured on this GPU: {n} at once before encodes slow each other down \
+                             (an RTX 4090 has two NVENC engines, an RTX 3080 one)"
+                        ),
+                        None => "Not measured yet".to_owned(),
+                    });
+                if slider.changed() {
+                    self.prefs.parallel_manual = true;
+                }
+                ui.end_row();
+                ui.label("");
+                ui.horizontal(|ui| {
+                    let measuring = self.measuring.is_some();
+                    let text = match (measuring, measured) {
+                        (true, _) => "measuring…".to_owned(),
+                        (false, Some(n)) => format!("measured: {n}"),
+                        (false, None) => "not measured".to_owned(),
+                    };
+                    ui.label(egui::RichText::new(text).weak().small());
+                    let back = self.prefs.parallel_manual
+                        && measured.is_some_and(|n| n != settings.parallel_encodes);
+                    if back && ui.small_button("Use it").clicked() {
+                        self.prefs.parallel_manual = false;
+                        settings.parallel_encodes = measured.unwrap_or(settings.parallel_encodes);
+                    }
+                    if !measuring
+                        && ui
+                            .small_button("Measure again")
+                            .on_hover_text(
+                                "A few seconds; new estimates and encodes wait meanwhile",
+                            )
+                            .clicked()
+                    {
+                        self.prefs.parallel_manual = false;
+                        self.start_parallel_measurement(true);
+                    }
+                });
                 ui.end_row();
             });
         if settings != self.queue.settings {
@@ -669,14 +706,22 @@ impl TranscoderApp {
                     }
                 });
                 ui.add_space(6.0);
-                if ui.button("Add the built-in Messenger profile").clicked() {
-                    let mut profile = Profile::messenger();
-                    if self.profiles.find(&profile.name).is_some() {
-                        profile.name = format!("Messenger {}", self.profiles.profiles.len() + 1);
-                    }
-                    self.profiles.profiles.push(profile);
-                    changed = true;
-                }
+                // Built-in profiles missing from the file (deleted, or added in a later version).
+                let missing: Vec<Profile> = Profile::built_ins()
+                    .into_iter()
+                    .filter(|p| self.profiles.find(&p.name).is_none())
+                    .collect();
+                ui.add_enabled_ui(!missing.is_empty(), |ui| {
+                    ui.menu_button("Add a built-in profile", |ui| {
+                        for profile in missing {
+                            if ui.button(&profile.name).clicked() {
+                                self.profiles.profiles.push(profile);
+                                changed = true;
+                                ui.close();
+                            }
+                        }
+                    });
+                });
             });
         if let Some(index) = raise {
             self.profiles.profiles.swap(index, index - 1);

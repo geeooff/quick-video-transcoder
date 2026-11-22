@@ -55,7 +55,20 @@ filters, and keeps the engine that worked; the preview switches to the software 
 | 4 | 13.0 s | 7.3x |
 | 6 | 19.3 s | 7.3x |
 
-Two encodes saturate the card (two NVENC engines): the default is two.
+Two encodes saturate the card (two NVENC engines). The engine count varies within a generation (one
+NVENC on an RTX 3080, two on an RTX 4090, per NVIDIA's support matrix) and no tool reports it, so the
+application measures it (`hardware::measure_parallel_encodes`): 1, 2, 3… encodes of a synthetic 1080p60
+picture at once, until one more adds less than half of what one encode does alone. About 7 s, once per
+GPU, driver and encoder; new estimates and encodes wait meanwhile, and the result sets *Encodes at once*
+unless the user set it by hand. Measured 2026-11-23 with `hevc_nvenc` p7 on the RTX 4090: 146, 289 and
+302 frames/s for 1, 2 and 3 encodes, so 2.
+
+## Frame rates
+
+The nominal rate comes from ffprobe's `r_frame_rate` only when it is a standard rate; game captures are
+variable rate, and an Xbox HDR capture reported `r_frame_rate=56/1` for an average of 59.3 fps. Otherwise
+the standard rate within 3 % of `avg_frame_rate` is taken (59.94 there), then the raw values
+(`probe::nominal_rate`).
 
 ## The size fitting
 

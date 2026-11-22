@@ -170,6 +170,40 @@ impl Profile {
         }
     }
 
+    /// A Discord profile: H.265 up to 1080p60 (2160p60 with `max_short_side`), SDR, under `max_size_mb`.
+    /// Discord plays MP4 in H.264, HEVC or AV1 and checks the size before any compression; the desktop app
+    /// sends the file as is. See docs/discord.md.
+    fn discord(name: &str, max_size_mb: f64, max_short_side: u32, audio_bitrate_kbps: u32) -> Self {
+        Self {
+            name: name.to_owned(),
+            suffix: "_discord".to_owned(),
+            max_size_mb,
+            max_short_side,
+            min_short_side: 360,
+            max_fps: 60.0,
+            min_fps: 24.0,
+            audio_bitrate_kbps,
+            ..Self::messenger()
+        }
+    }
+
+    /// Every built-in profile, the default first: Messenger, then Discord for each upload limit (free
+    /// accounts, Nitro Basic or a level 2 server, a level 3 server, Nitro).
+    pub fn built_ins() -> Vec<Self> {
+        vec![
+            Self::messenger(),
+            Self::discord("Discord (20 MB)", 20.0, 1080, 128),
+            Self::discord(
+                "Discord Nitro Basic / server level 2 (50 MB)",
+                50.0,
+                1080,
+                160,
+            ),
+            Self::discord("Discord server level 3 (100 MB)", 100.0, 1080, 160),
+            Self::discord("Discord Nitro (1 GB)", 1000.0, 2160, 192),
+        ]
+    }
+
     /// Largest output size in bytes.
     pub fn max_bytes(&self) -> u64 {
         (self.max_size_mb.max(0.1) * 1_000_000.0) as u64
@@ -218,7 +252,7 @@ pub struct ProfileSet {
 impl Default for ProfileSet {
     fn default() -> Self {
         Self {
-            profiles: vec![Profile::messenger()],
+            profiles: Profile::built_ins(),
         }
     }
 }
@@ -343,7 +377,26 @@ mod tests {
         let start = readme.find("```toml\n").expect("a TOML example") + "```toml\n".len();
         let end = start + readme[start..].find("```").expect("its end");
         let set = ProfileSet::parse(&readme[start..end]).unwrap();
-        assert_eq!(set, ProfileSet::default());
+        assert_eq!(set.profiles, [Profile::messenger()]);
+    }
+
+    #[test]
+    fn the_built_in_profiles_are_valid_and_distinct() {
+        let built_ins = Profile::built_ins();
+        assert_eq!(built_ins[0], Profile::messenger());
+        for profile in &built_ins {
+            let mut sanitized = profile.clone();
+            assert!(sanitized.sanitize().is_empty(), "{}", profile.name);
+            assert_eq!(&sanitized, profile, "{}", profile.name);
+        }
+        let mut names: Vec<&str> = built_ins.iter().map(|p| p.name.as_str()).collect();
+        names.dedup();
+        assert_eq!(names.len(), built_ins.len());
+        let discord = &built_ins[1];
+        assert_eq!(
+            (discord.max_bytes(), discord.max_short_side, discord.max_fps),
+            (20_000_000, 1080, 60.0)
+        );
     }
 
     #[test]

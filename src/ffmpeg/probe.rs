@@ -243,6 +243,65 @@ struct ProbeFormat {
     size: Option<String>,
 }
 
+/// The frame rates capture devices and players use.
+const STANDARD_RATES: [FrameRate; 17] = [
+    FrameRate::new(24000, 1001),
+    FrameRate::new(24, 1),
+    FrameRate::new(25, 1),
+    FrameRate::new(30000, 1001),
+    FrameRate::new(30, 1),
+    FrameRate::new(48, 1),
+    FrameRate::new(50, 1),
+    FrameRate::new(60000, 1001),
+    FrameRate::new(60, 1),
+    FrameRate::new(72, 1),
+    FrameRate::new(90, 1),
+    FrameRate::new(100, 1),
+    FrameRate::new(120000, 1001),
+    FrameRate::new(120, 1),
+    FrameRate::new(144, 1),
+    FrameRate::new(165, 1),
+    FrameRate::new(240, 1),
+];
+
+/// The standard rate nearest to `rate` and its relative distance.
+fn nearest_standard(rate: FrameRate) -> (FrameRate, f64) {
+    STANDARD_RATES
+        .iter()
+        .map(|&standard| (standard, (rate.as_f64() / standard.as_f64() - 1.0).abs()))
+        .min_by(|a, b| a.1.total_cmp(&b.1))
+        .expect("the list is not empty")
+}
+
+/// The nominal frame rate of a stream from ffprobe's `r_frame_rate` (its guess of the base rate) and
+/// `avg_frame_rate` (frames over duration).
+///
+/// Game captures have a variable frame rate, and ffprobe's guess can be far off: an Xbox HDR capture
+/// reports `r_frame_rate=56/1` for an average of 59.3 fps, which would make 28 fps outputs. So: the guess
+/// when it is a standard rate; else the standard rate within 3 % of the average (59.3 → 59.94); else the
+/// guess when it agrees with the average within 5 %, else the average.
+fn nominal_rate(guess: Option<FrameRate>, average: Option<FrameRate>) -> FrameRate {
+    if let Some(guess) = guess
+        && nearest_standard(guess).1 < 0.001
+    {
+        return guess;
+    }
+    if let Some(average) = average {
+        let (standard, distance) = nearest_standard(average);
+        if distance < 0.03 {
+            return standard;
+        }
+    }
+    match (guess, average) {
+        (Some(guess), Some(average)) if (guess.as_f64() / average.as_f64() - 1.0).abs() < 0.05 => {
+            guess
+        }
+        (_, Some(average)) => FrameRate::new((average.as_f64() * 1000.0).round() as u32, 1000),
+        (Some(guess), None) => guess,
+        (None, None) => FrameRate::new(30, 1),
+    }
+}
+
 /// Parses the JSON printed by `ffprobe -print_format json -show_format -show_streams`.
 pub fn parse_probe_json(json: &str) -> Result<MediaInfo> {
     let output: ProbeOutput = serde_json::from_str(json).context("invalid ffprobe output")?;
@@ -258,11 +317,12 @@ pub fn parse_probe_json(json: &str) -> Result<MediaInfo> {
     let (Some(width), Some(height)) = (video.width, video.height) else {
         bail!("video stream without dimensions");
     };
-    let frame_rate = [&video.r_frame_rate, &video.avg_frame_rate]
-        .into_iter()
-        .flatten()
-        .find_map(|r| FrameRate::parse(r).filter(|r| r.as_f64() <= 1000.0))
-        .unwrap_or(FrameRate::new(30, 1));
+    let parse = |rate: &Option<String>| {
+        rate.as_deref()
+            .and_then(FrameRate::parse)
+            .filter(|r| r.as_f64() <= 1000.0)
+    };
+    let frame_rate = nominal_rate(parse(&video.r_frame_rate), parse(&video.avg_frame_rate));
     // The video stream's own duration: the audio often lasts a little longer.
     let duration = video
         .duration()
@@ -400,6 +460,32 @@ mod tests {
         assert!(info.untagged);
         assert!(!parse_probe_json(HDR_CAPTURE).unwrap().untagged);
         assert!((info.duration - 59.178563).abs() < 1e-9);
+    }
+
+    #[test]
+    fn finds_the_nominal_rate_of_variable_rate_captures() {
+        let rate = |text: &str| FrameRate::parse(text);
+        // Xbox HDR capture: ffprobe guesses 56 fps for an average of 59.3.
+        assert_eq!(
+            nominal_rate(rate("56/1"), rate("52440000/884321")),
+            FrameRate::new(60000, 1001)
+        );
+        // Xbox SDR capture: the guess is standard, the average is lower.
+        assert_eq!(
+            nominal_rate(rate("60000/1001"), rate("52215000/886891")),
+            FrameRate::new(60000, 1001)
+        );
+        // NVIDIA app capture: 60 guessed, 60.0 on average.
+        assert_eq!(
+            nominal_rate(rate("60/1"), rate("125730000/2095409")),
+            FrameRate::new(60, 1)
+        );
+        // A real, non standard rate is kept.
+        assert_eq!(
+            nominal_rate(rate("56/1"), rate("56/1")),
+            FrameRate::new(56, 1)
+        );
+        assert_eq!(nominal_rate(None, None), FrameRate::new(30, 1));
     }
 
     #[test]

@@ -17,7 +17,8 @@ and any video FFmpeg reads.
   is, then picks the best target that fits the limit: it lowers the frame rate, then the resolution, only
   when the quality would otherwise fall too low, and stops spending bytes once more would not show.
 - **Profiles.** A profile is a destination's limits: size, resolution, frame rate, codec, SDR only or not,
-  sound. The built-in *Messenger* profile is 720p, 30 fps, H.265, under 25 MB. Edit any setting on one or
+  sound. Built-in profiles: *Messenger* (720p, 30 fps, H.265, under 25 MB) and *Discord* for each
+  upload limit (20 MB, 50 MB, 100 MB, 1 GB). Edit any setting on one or
   several selected videos, and save it as a new profile.
 - **HDR to SDR done right.** An HDR capture is tone mapped on the GPU by libplacebo, with peak detection
   and gamut mapping, and the preview shows it exactly as it will be encoded.
@@ -52,7 +53,8 @@ Nothing is ever overwritten: an output name that exists gets ` (2)`, and the sou
    window).
 2. Click a video to preview it. Trim it with the handles, `I` / `O`, or the start and end fields.
 3. Read the estimate under each video: the output it will get, its size, a word for its quality.
-4. *Encode selected* or *Encode all*. Two videos encode at a time.
+4. *Encode selected* or *Encode all*. As many videos encode at a time as your GPU handles: the
+   application measures it once, in a few seconds, the first time it runs on a GPU.
 5. *Copy* on an encoded video, then paste it into the conversation.
 
 Keyboard shortcuts are under *Help*.
@@ -95,6 +97,7 @@ for what is documented and how to measure it.
 | Page | For |
 | --- | --- |
 | [Messenger's limits](docs/messenger.md) | What Meta documents, and how to measure the rest. |
+| [Discord's limits](docs/discord.md) | Upload limits with and without Nitro, formats, the Discord profiles. |
 | [Architecture](docs/architecture.md) | How the size fitting, the filters and the preview work, with measurements. |
 | [Changelog](CHANGELOG.md) | What each release changed. |
 | [Contributing](CONTRIBUTING.md) | Building, testing, rules. |
