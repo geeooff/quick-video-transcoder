@@ -296,7 +296,7 @@ impl EstimateRequest {
         OutputColor::choose(
             &self.media,
             self.profile.sdr_only,
-            self.profile.codec.supports_hdr(),
+            self.encoder.codec.supports_hdr(),
         )
     }
 }
@@ -432,7 +432,7 @@ pub fn sample_args(
     ));
     args.extend([
         "-f".to_owned(),
-        elementary_format(request.profile.codec).to_owned(),
+        elementary_format(request.encoder.codec).to_owned(),
         "pipe:1".to_owned(),
     ]);
     args

@@ -96,6 +96,19 @@ Measured on real captures (2026-11-20, Messenger profile): a 23.6 s 4K60 AV1 HDR
 at the ceiling, 17.6 MB predicted 19.4; a 59.8 s 1080p60 H.264 Xbox capture fitted at 720p29.97 QP 22.8,
 24.72 MB predicted 23.99 (98.9 % of the limit, first attempt).
 
+## The encoder
+
+A profile lists the codecs its destination plays, preferred first (`Profile::codecs`).
+`Capabilities::choose` takes, in order: the first codec the user's chosen backend encodes, when one is
+chosen; else the first codec with any hardware encoder, on its best hardware backend (NVENC, Quick Sync,
+AMF); else the first codec the CPU encodes. A GPU encode of a codec the destination plays always beats a
+CPU encode of a preferred one: a laptop with AV1 on NVENC and H.265 on Quick Sync gets AV1 on NVENC for
+`AV1 > H.265`, an RTX 3080 (no AV1 encoder) gets H.265 on NVENC. The chosen encoder's codec decides
+whether HDR can be kept and the samples' elementary stream format.
+
+The first AV1 encode measured (2026-11-23, `av1_nvenc`, a synthetic HDR clip to 1080p60 under 20 MB) came
+out 0.03 % over the limit and was re-encoded once, to 97.4 % of it.
+
 ## Files written
 
 Only the output and its partial file. FFmpeg writes `<output>.qvt-partial`, checked by

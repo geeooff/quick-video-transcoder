@@ -106,7 +106,7 @@ fn check(clip: &Path, dir: &Path, capabilities: &Capabilities, hdr: bool) {
         ..Profile::messenger()
     };
     let encoder = capabilities
-        .encoder(profile.codec, None)
+        .choose(&profile.codecs, None)
         .expect("an H.265 encoder works");
     let slots = Slots::new(4);
     let cancel = Arc::new(AtomicBool::new(false));

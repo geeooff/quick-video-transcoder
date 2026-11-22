@@ -29,7 +29,7 @@ pub(super) fn apply_changes(target: &mut Profile, before: &Profile, after: &Prof
         min_short_side,
         max_fps,
         min_fps,
-        codec,
+        codecs,
         sdr_only,
         tone_mapping,
         audio_bitrate_kbps,
@@ -176,10 +176,38 @@ impl TranscoderApp {
         }
 
         let mut after = before.clone();
-        let codecs: Vec<VideoCodec> = VideoCodec::ALL
-            .into_iter()
-            .filter(|&c| !self.queue.capabilities.backends(c).is_empty())
-            .collect();
+        // Codec lists offered, preferred codec first; the profile's own list comes first when it differs.
+        let mut lists: Vec<Vec<VideoCodec>> = vec![
+            vec![VideoCodec::Av1, VideoCodec::H265, VideoCodec::H264],
+            vec![VideoCodec::H265, VideoCodec::H264],
+            vec![VideoCodec::H264],
+            vec![VideoCodec::H265],
+            vec![VideoCodec::Av1],
+        ];
+        if let Some(origin) = &origin
+            && !lists.contains(&origin.codecs)
+        {
+            lists.insert(0, origin.codecs.clone());
+        }
+        let capabilities = self.queue.capabilities.clone();
+        let backend = self.queue.settings.backend;
+        let resolved = |codecs: &[VideoCodec]| {
+            capabilities.choose(codecs, backend).map_or_else(
+                || "no encoder".to_owned(),
+                |spec| format!("{} ({})", spec.codec.label(), spec.backend.label()),
+            )
+        };
+        let list_label = |codecs: &[VideoCodec]| {
+            if codecs.len() == 1 {
+                format!("{} only", codecs[0].label())
+            } else {
+                codecs
+                    .iter()
+                    .map(|c| c.label())
+                    .collect::<Vec<_>>()
+                    .join(" > ")
+            }
+        };
         egui::Grid::new("limits")
             .num_columns(2)
             .spacing([12.0, 6.0])
@@ -221,17 +249,28 @@ impl TranscoderApp {
 
                 ui.label("Codec");
                 egui::ComboBox::from_id_salt("codec")
-                    .selected_text(after.codec.label())
+                    .selected_text(format!(
+                        "{} → {}",
+                        list_label(&after.codecs),
+                        resolved(&after.codecs)
+                    ))
+                    .width(220.0)
                     .show_ui(ui, |ui| {
-                        for codec in &codecs {
-                            ui.selectable_value(&mut after.codec, *codec, codec.label());
+                        for list in &lists {
+                            let text = format!("{}  → {}", list_label(list), resolved(list));
+                            ui.selectable_value(&mut after.codecs, list.clone(), text);
                         }
-                    });
+                    })
+                    .response
+                    .on_hover_text(
+                        "The codecs the destination plays, preferred first: the first one your GPU \
+                         encodes is used, else the first one the CPU encodes",
+                    );
                 ui.end_row();
 
                 ui.label("HDR");
                 ui.add_enabled(
-                    after.codec.supports_hdr(),
+                    after.codecs.iter().any(|c| c.supports_hdr()),
                     egui::Checkbox::new(&mut after.sdr_only, "Convert to SDR"),
                 )
                 .on_hover_text(
@@ -691,7 +730,7 @@ impl TranscoderApp {
                                 profile.max_size_mb,
                                 profile.max_short_side,
                                 profile.max_fps,
-                                profile.codec.label(),
+                                profile.codecs_label(),
                                 if profile.sdr_only { " · SDR" } else { "" }
                             ))
                             .weak(),
@@ -773,12 +812,12 @@ mod tests {
         };
         let mut other = Profile {
             max_short_side: 1080,
-            codec: VideoCodec::Av1,
+            codecs: vec![VideoCodec::Av1],
             ..Profile::messenger()
         };
         apply_changes(&mut other, &before, &after);
         assert_eq!(other.max_size_mb, 50.0);
         assert_eq!(other.max_short_side, 1080);
-        assert_eq!(other.codec, VideoCodec::Av1);
+        assert_eq!(other.codecs, [VideoCodec::Av1]);
     }
 }

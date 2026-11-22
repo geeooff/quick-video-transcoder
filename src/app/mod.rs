@@ -374,8 +374,8 @@ impl TranscoderApp {
     /// Measures how many encodes the default encoder runs at once, unless this GPU, driver and encoder
     /// were measured before (or `again`). The queue holds new work back meanwhile (a few seconds).
     fn start_parallel_measurement(&mut self, again: bool) {
-        let codec = self.default_profile().codec;
-        let Some(spec) = self.queue.capabilities.encoder(codec, self.prefs.backend) else {
+        let codecs = self.default_profile().codecs;
+        let Some(spec) = self.queue.capabilities.choose(&codecs, self.prefs.backend) else {
             return;
         };
         let key = format!("{} / {}", self.gpu, spec.name);
