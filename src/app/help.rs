@@ -22,7 +22,7 @@ impl TranscoderApp {
         if files.is_empty() {
             return;
         }
-        self.info(format!("{} file(s) received from Send to", files.len()));
+        self.info(crate::tr!("app-files-received", count = files.len()));
         self.add_files(files);
         ctx.send_viewport_cmd(egui::ViewportCommand::Minimized(false));
         ctx.send_viewport_cmd(egui::ViewportCommand::Focus);
@@ -35,20 +35,21 @@ impl TranscoderApp {
     /// *File* menu: add the application to Explorer's *Send to* menu, or take it away.
     pub(super) fn sendto_menu(&mut self, ui: &mut egui::Ui) {
         let label = if self.sendto_installed {
-            "Update the Send to shortcut"
+            crate::tr!("sendto-menu-update")
         } else {
-            "Add to Explorer's Send to menu"
+            crate::tr!("sendto-menu-add")
         };
         if ui
             .button(label)
-            .on_hover_text(
-                "Select videos in Explorer, right-click, Send to, Quick Video Transcoder",
-            )
+            .on_hover_text(crate::tr!("sendto-menu-tooltip"))
             .clicked()
         {
             ui.close();
             match crate::sendto::install() {
-                Ok(link) => self.info(format!("Send to shortcut written: {}", link.display())),
+                Ok(link) => self.info(crate::tr!(
+                    "sendto-menu-written",
+                    path = link.display().to_string()
+                )),
                 Err(error) => self.error(format!("{error:#}")),
             }
             self.sendto_installed = crate::sendto::is_installed();
@@ -56,13 +57,13 @@ impl TranscoderApp {
         if ui
             .add_enabled(
                 self.sendto_installed,
-                egui::Button::new("Remove from Explorer's Send to menu"),
+                egui::Button::new(crate::tr!("sendto-menu-remove")),
             )
             .clicked()
         {
             ui.close();
             match crate::sendto::remove() {
-                Ok(()) => self.info("Send to shortcut removed"),
+                Ok(()) => self.info(crate::tr!("sendto-menu-removed")),
                 Err(error) => self.error(format!("{error:#}")),
             }
             self.sendto_installed = crate::sendto::is_installed();
@@ -71,32 +72,34 @@ impl TranscoderApp {
 
     pub(super) fn about_window(&mut self, ctx: &egui::Context) {
         let mut show_notices = false;
-        egui::Window::new("About Quick Video Transcoder")
+        // A fixed id: the title changes with the language, and the window keeps its place.
+        egui::Window::new(crate::tr!("about-title"))
+            .id(egui::Id::unique("about window"))
             .open(&mut self.show_about)
             .resizable(false)
             .collapsible(false)
             .show(ctx, |ui| {
-                ui.heading(format!("Quick Video Transcoder {}", build_info::VERSION));
-                ui.label("Trims game captures and re-encodes them to fit a size limit.");
+                ui.heading(crate::tr!("about-heading", version = build_info::VERSION));
+                ui.label(crate::tr!("about-summary"));
                 ui.add_space(8.0);
                 egui::Grid::new("about").num_columns(2).show(ui, |ui| {
-                    ui.label("Commit");
+                    ui.label(crate::tr!("about-commit"));
                     ui.monospace(format!("{}{}", build_info::COMMIT_SHORT, build_info::DIRTY));
                     ui.end_row();
-                    ui.label("Documentation");
-                    ui.hyperlink_to("for this version", build_info::documentation());
+                    ui.label(crate::tr!("about-documentation"));
+                    ui.hyperlink_to(
+                        crate::tr!("about-documentation-link"),
+                        build_info::documentation(),
+                    );
                     ui.end_row();
-                    ui.label("Changes");
+                    ui.label(crate::tr!("about-changes"));
                     ui.hyperlink_to("CHANGELOG.md", build_info::doc_url("CHANGELOG.md"));
                     ui.end_row();
-                    ui.label("Licence");
+                    ui.label(crate::tr!("about-licence"));
                     ui.hyperlink_to("MIT", build_info::doc_url("LICENSE"));
                     ui.end_row();
-                    ui.label("Built with");
-                    if ui
-                        .link("third-party libraries and their licences")
-                        .clicked()
-                    {
+                    ui.label(crate::tr!("about-built-with"));
+                    if ui.link(crate::tr!("about-third-party-link")).clicked() {
                         show_notices = true;
                     }
                     ui.end_row();
@@ -110,7 +113,7 @@ impl TranscoderApp {
     /// Writes the notices built into the executable to the data folder and opens them in the browser.
     fn open_notices(&mut self) {
         let Some(dir) = crate::profile::data_dir() else {
-            self.error("no data folder to open the third-party notices from");
+            self.error(crate::tr!("about-notices-no-folder"));
             return;
         };
         let path = dir.join("THIRD-PARTY-NOTICES.html");
@@ -118,7 +121,11 @@ impl TranscoderApp {
             std::fs::create_dir_all(&dir).and_then(|()| std::fs::write(&path, build_info::NOTICES));
         match written {
             Ok(()) => super::open_file(&path),
-            Err(error) => self.error(format!("cannot write {}: {error}", path.display())),
+            Err(error) => self.error(crate::tr!(
+                "about-notices-failed",
+                path = path.display().to_string(),
+                detail = error.to_string()
+            )),
         }
     }
 
@@ -131,7 +138,8 @@ impl TranscoderApp {
         help.poll();
         let mut open = true;
         let mut action = None;
-        egui::Window::new("FFmpeg is needed")
+        egui::Window::new(crate::tr!("ffmpeg-title"))
+            .id(egui::Id::unique("ffmpeg window"))
             .open(&mut open)
             .resizable(false)
             .collapsible(false)
@@ -163,9 +171,9 @@ fn help_install(app: &mut TranscoderApp) {
     });
     help.installing = Some(receiver);
     help.failure = None;
-    app.info(format!(
-        "installing FFmpeg with winget ({})…",
-        crate::ffmpeg::WINGET_PACKAGE
+    app.info(crate::tr!(
+        "ffmpeg-install-log",
+        package = crate::ffmpeg::WINGET_PACKAGE
     ));
 }
 
@@ -223,12 +231,13 @@ impl FfmpegHelp {
     fn ui(&mut self, ui: &mut egui::Ui) -> Option<Action> {
         let mut action = None;
         ui.label(match &self.problem {
-            Install::Missing(program) => format!(
-                "Quick Video Transcoder reads and encodes videos with FFmpeg, a free program it does \
-                 not include, and {program} cannot be found on this computer."
-            ),
-            Install::TooOld(version) => format!(
-                "The FFmpeg found is too old ({version}). Version {MIN_MAJOR_VERSION} or later is needed."
+            Install::Missing(program) => {
+                crate::tr!("ffmpeg-missing", program = program.to_string())
+            }
+            Install::TooOld(version) => crate::tr!(
+                "ffmpeg-too-old",
+                version = version.clone(),
+                required = MIN_MAJOR_VERSION
             ),
             Install::Ready(_) => String::new(),
         });
@@ -241,54 +250,54 @@ impl FfmpegHelp {
             (_, Some(_)) => {
                 ui.horizontal(|ui| {
                     ui.spinner();
-                    ui.label("Installing FFmpeg with winget: a minute or two…");
+                    ui.label(crate::tr!("ffmpeg-installing"));
                 });
             }
             (Some(true), None) => {
-                ui.label(format!(
-                    "It can be installed for you with winget, Windows' package manager: the {} \
-                     package (gyan.dev's full build, about 100 MB, for your account only).",
-                    crate::ffmpeg::WINGET_PACKAGE
+                ui.label(crate::tr!(
+                    "ffmpeg-winget-offer",
+                    package = crate::ffmpeg::WINGET_PACKAGE
                 ));
-                if ui.button("Install FFmpeg for me").clicked() {
+                if ui.button(crate::tr!("ffmpeg-install-button")).clicked() {
                     action = Some(Action::Install);
                 }
                 ui.label(
-                    egui::RichText::new(
-                        "Installing accepts the package's licence (GPL) and the winget source's terms.",
-                    )
-                    .small()
-                    .weak(),
+                    egui::RichText::new(crate::tr!("ffmpeg-licence-note"))
+                        .small()
+                        .weak(),
                 );
                 if let Some(failure) = &self.failure {
                     ui.colored_label(ui.visuals().error_fg_color, failure);
                 }
                 ui.add_space(10.0);
-                ui.label("Or install it yourself:");
+                ui.label(crate::tr!("ffmpeg-or-yourself"));
             }
             (None, None) => {
                 ui.horizontal(|ui| {
                     ui.spinner();
-                    ui.label("Looking for winget…");
+                    ui.label(crate::tr!("ffmpeg-looking-for-winget"));
                 });
             }
             (Some(false), None) => {}
         }
         ui.horizontal(|ui| {
-            ui.label("In Terminal:");
+            ui.label(crate::tr!("ffmpeg-in-terminal"));
             ui.code(WINGET_COMMAND);
-            if ui.small_button("Copy").clicked() {
+            if ui.small_button(crate::tr!("ffmpeg-copy")).clicked() {
                 ui.ctx().copy_text(WINGET_COMMAND.to_owned());
             }
         });
         ui.horizontal(|ui| {
-            ui.label("Or download the \"release full\" build from");
+            ui.label(crate::tr!("ffmpeg-download"));
             ui.hyperlink(FFMPEG_BUILDS);
         });
-        ui.label("unzip it, and add its bin folder to the Path environment variable.");
+        ui.label(crate::tr!("ffmpeg-unzip"));
         ui.add_space(12.0);
         if ui
-            .add_enabled(self.installing.is_none(), egui::Button::new("Check again"))
+            .add_enabled(
+                self.installing.is_none(),
+                egui::Button::new(crate::tr!("ffmpeg-check-again")),
+            )
             .clicked()
         {
             action = Some(Action::CheckAgain);

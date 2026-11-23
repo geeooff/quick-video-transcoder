@@ -30,11 +30,11 @@ impl TranscoderApp {
     pub(super) fn queue_panel(&mut self, ui: &mut egui::Ui) {
         ui.add_space(6.0);
         ui.horizontal(|ui| {
-            ui.heading("Queue");
+            ui.heading(crate::tr!("queue-panel-heading"));
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                 if ui
-                    .button("➕ Add…")
-                    .on_hover_text("Add videos (Ctrl+O), or drop them here")
+                    .button(format!("➕ {}", crate::tr!("queue-panel-add")))
+                    .on_hover_text(crate::tr!("queue-panel-add-tooltip"))
                     .clicked()
                 {
                     self.add_dialog();
@@ -48,8 +48,12 @@ impl TranscoderApp {
         if self.queue.jobs.is_empty() {
             ui.add_space(40.0);
             ui.vertical_centered(|ui| {
-                ui.label(RichText::new("Drop videos here").size(18.0).weak());
-                ui.label(RichText::new("or use Explorer's Send to menu").weak());
+                ui.label(
+                    RichText::new(crate::tr!("queue-panel-empty-title"))
+                        .size(18.0)
+                        .weak(),
+                );
+                ui.label(RichText::new(crate::tr!("queue-panel-empty-hint")).weak());
             });
             return;
         }
@@ -185,20 +189,21 @@ impl TranscoderApp {
                 let kept = job.trim.duration();
                 let trimmed = (kept - media.duration).abs() > 0.05;
                 let duration = if trimmed {
-                    format!(
-                        "{} of {}",
-                        timecode::format_short(kept, true),
-                        timecode::format_short(media.duration, false)
+                    crate::tr!(
+                        "queue-panel-duration-trimmed",
+                        kept = timecode::format_short(kept, true),
+                        total = timecode::format_short(media.duration, false)
                     )
                 } else {
                     timecode::format_short(kept, true)
                 };
                 ui.add(
                     egui::Label::new(
-                        RichText::new(format!(
-                            "{} · {duration} · {}",
-                            media.summary(),
-                            job.profile.name
+                        RichText::new(crate::tr!(
+                            "queue-panel-row-details",
+                            summary = media.summary(),
+                            duration = duration,
+                            profile = job.profile.name.clone()
                         ))
                         .small()
                         .weak(),
@@ -211,7 +216,7 @@ impl TranscoderApp {
                 Phase::Probing => {
                     ui.horizontal(|ui| {
                         ui.spinner();
-                        ui.label(RichText::new("Reading…").small());
+                        ui.label(RichText::new(crate::tr!("queue-panel-reading")).small());
                     });
                 }
                 Phase::Unusable(error) => {
@@ -227,55 +232,58 @@ impl TranscoderApp {
                 Phase::Estimating => {
                     ui.horizontal(|ui| {
                         ui.spinner();
-                        ui.label(RichText::new("Estimating the size…").small());
+                        ui.label(RichText::new(crate::tr!("queue-panel-estimating")).small());
                     });
                 }
                 Phase::Waiting => {
                     ui.horizontal(|ui| {
-                        ui.label(RichText::new("Waiting for an encoder…").small());
-                        if ui.small_button("Cancel").clicked() {
+                        ui.label(RichText::new(crate::tr!("queue-panel-waiting")).small());
+                        if ui.small_button(crate::tr!("queue-panel-cancel")).clicked() {
                             action = Some(RowAction::Cancel);
                         }
                     });
                 }
                 Phase::Encoding(progress) => {
                     ui.horizontal(|ui| {
-                        let mut text = format!("{:.0} %", progress.fraction * 100.0);
-                        if let Some(speed) = progress.speed {
-                            text.push_str(&format!(" · {speed:.1}x"));
-                        }
-                        if progress.attempt > 1 {
-                            text.push_str(&format!(" · retry {}", progress.attempt - 1));
-                        }
+                        let text = crate::tr!(
+                            "queue-panel-progress",
+                            percent = f64::from(progress.fraction * 100.0),
+                            speed = progress.speed.unwrap_or(0.0),
+                            retry = progress.attempt.saturating_sub(1)
+                        );
                         ui.add(
                             egui::ProgressBar::new(progress.fraction)
                                 .desired_width(ui.available_width() - 60.0)
                                 .desired_height(14.0)
                                 .text(RichText::new(text).small()),
                         );
-                        if ui.small_button("Cancel").clicked() {
+                        if ui.small_button(crate::tr!("queue-panel-cancel")).clicked() {
                             action = Some(RowAction::Cancel);
                         }
                     });
                 }
                 Phase::Done(encoded) => {
                     ui.horizontal(|ui| {
+                        let mb = encoded.bytes as f64 / 1e6;
                         ui.label(
-                            RichText::new(format!("✔ {:.2} MB", encoded.bytes as f64 / 1e6))
-                                .small()
-                                .color(GOOD),
+                            RichText::new(format!(
+                                "✔ {}",
+                                crate::tr!("queue-panel-done-size", mb = mb)
+                            ))
+                            .small()
+                            .color(GOOD),
                         )
                         .on_hover_text(encoded.output.display().to_string());
                         if ui
-                            .small_button("Copy")
-                            .on_hover_text("Copy the file, to paste it into the conversation")
+                            .small_button(crate::tr!("queue-panel-copy"))
+                            .on_hover_text(crate::tr!("queue-panel-copy-tooltip"))
                             .clicked()
                         {
                             action = Some(RowAction::Copy);
                         }
                         if ui
-                            .small_button("Show")
-                            .on_hover_text("Show in Explorer")
+                            .small_button(crate::tr!("queue-panel-show"))
+                            .on_hover_text(crate::tr!("queue-panel-show-tooltip"))
                             .clicked()
                         {
                             action = Some(RowAction::Reveal);
@@ -300,13 +308,14 @@ impl TranscoderApp {
                             Verdict::Fitted => ui.visuals().text_color(),
                             Verdict::BelowFloor => WARN,
                         };
-                        let wanted = if job.wanted { " · queued" } else { "" };
+                        let mb = estimate.predicted_bytes as f64 / 1e6;
                         ui.label(
-                            RichText::new(format!(
-                                "{} · ≈ {:.1} MB · {}{wanted}",
-                                estimate.target.label(),
-                                estimate.predicted_bytes as f64 / 1e6,
-                                quality_word(estimate.quality)
+                            RichText::new(crate::tr!(
+                                "queue-panel-estimate",
+                                target = estimate.target.label(),
+                                mb = mb,
+                                quality = quality_word(estimate.quality).to_string(),
+                                queued = if job.wanted { "yes" } else { "no" }
                             ))
                             .small()
                             .color(color),
@@ -324,7 +333,11 @@ impl TranscoderApp {
                         .on_hover_text(error);
                     }
                     None => {
-                        ui.label(RichText::new("Settings changed…").small().weak());
+                        ui.label(
+                            RichText::new(crate::tr!("queue-panel-settings-changed"))
+                                .small()
+                                .weak(),
+                        );
                     }
                 },
             }
@@ -349,12 +362,16 @@ impl TranscoderApp {
             .count();
         ui.horizontal_wrapped(|ui| {
             let encode = egui::Button::new(
-                RichText::new(format!("▶ Encode selected ({selected_ready})")).strong(),
+                RichText::new(format!(
+                    "▶ {}",
+                    crate::tr!("queue-panel-encode-selected", count = selected_ready)
+                ))
+                .strong(),
             )
             .fill(ACCENT.gamma_multiply(0.6));
             if ui
                 .add_enabled(selected_ready > 0, encode)
-                .on_hover_text("Encode the selected videos with their estimate (Ctrl+E)")
+                .on_hover_text(crate::tr!("queue-panel-encode-selected-tooltip"))
                 .clicked()
             {
                 self.encode_selected();
@@ -362,7 +379,7 @@ impl TranscoderApp {
             if ui
                 .add_enabled(
                     all_ready > 0,
-                    egui::Button::new(format!("Encode all ({all_ready})")),
+                    egui::Button::new(crate::tr!("queue-panel-encode-all", count = all_ready)),
                 )
                 .clicked()
             {
@@ -376,7 +393,10 @@ impl TranscoderApp {
                 .map(|j| j.id)
                 .collect();
             if ui
-                .add_enabled(!running.is_empty(), egui::Button::new("⏹ Stop all"))
+                .add_enabled(
+                    !running.is_empty(),
+                    egui::Button::new(format!("⏹ {}", crate::tr!("queue-panel-stop-all"))),
+                )
                 .clicked()
             {
                 for id in running {
@@ -387,9 +407,9 @@ impl TranscoderApp {
             if ui
                 .add_enabled(
                     !done.is_empty(),
-                    egui::Button::new(format!("Copy encoded ({})", done.len())),
+                    egui::Button::new(crate::tr!("queue-panel-copy-encoded", count = done.len())),
                 )
-                .on_hover_text("Copy every encoded file, to paste them into a conversation")
+                .on_hover_text(crate::tr!("queue-panel-copy-encoded-tooltip"))
                 .clicked()
             {
                 self.copy_outputs(done);

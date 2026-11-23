@@ -183,7 +183,7 @@ impl TranscoderApp {
             Some(Err(error)) => {
                 log.push_back((
                     Level::Error,
-                    format!("{error:#}; using the built-in profile"),
+                    crate::tr!("app-profiles-load-failed", detail = format!("{error:#}")),
                 ));
                 ProfileSet::default()
             }
@@ -271,7 +271,10 @@ impl TranscoderApp {
         for path in files {
             let path = native_separators(path);
             if path.is_dir() {
-                self.error(format!("{} is a folder, not a video", path.display()));
+                self.error(crate::tr!(
+                    "app-folder-not-video",
+                    path = path.display().to_string()
+                ));
                 continue;
             }
             if let Some(dir) = path.parent() {
@@ -288,9 +291,9 @@ impl TranscoderApp {
 
     fn add_dialog(&mut self) {
         let mut dialog = rfd::FileDialog::new()
-            .set_title("Add videos")
-            .add_filter("Videos", &VIDEO_EXTENSIONS)
-            .add_filter("All files", &["*"]);
+            .set_title(crate::tr!("dialog-add-title"))
+            .add_filter(crate::tr!("dialog-add-filter-videos"), &VIDEO_EXTENSIONS)
+            .add_filter(crate::tr!("dialog-add-filter-all"), &["*"]);
         if let Some(dir) = &self.prefs.last_dir {
             dialog = dialog.set_directory(dir);
         }
@@ -357,21 +360,21 @@ impl TranscoderApp {
             return;
         }
         match crate::clipboard::copy_files(&files) {
-            Ok(()) => self.info(format!(
-                "{} file(s) copied: paste them into the conversation",
-                files.len()
-            )),
+            Ok(()) => self.info(crate::tr!("app-files-copied", count = files.len())),
             Err(error) => self.error(format!("{error:#}")),
         }
     }
 
     fn save_profiles(&mut self) {
         let Some(path) = self.profiles_path.clone() else {
-            self.error("no data folder: the profiles cannot be saved");
+            self.error(crate::tr!("app-profiles-no-folder"));
             return;
         };
         match self.profiles.save(&path) {
-            Ok(()) => self.info(format!("profiles saved to {}", path.display())),
+            Ok(()) => self.info(crate::tr!(
+                "app-profiles-saved",
+                path = path.display().to_string()
+            )),
             Err(error) => self.error(format!("{error:#}")),
         }
     }
@@ -384,19 +387,25 @@ impl TranscoderApp {
         self.detection = None;
         match &install {
             Install::Ready(version) => self.info(version.clone()),
-            Install::Missing(program) => self.error(format!("{program} is not on the PATH")),
-            Install::TooOld(version) => self.error(format!(
-                "{version}: FFmpeg {} or later is needed",
-                crate::ffmpeg::MIN_MAJOR_VERSION
+            Install::Missing(program) => {
+                self.error(crate::tr!(
+                    "app-ffmpeg-missing",
+                    program = program.to_string()
+                ));
+            }
+            Install::TooOld(version) => self.error(crate::tr!(
+                "app-ffmpeg-too-old",
+                version = version.clone(),
+                required = crate::ffmpeg::MIN_MAJOR_VERSION
             )),
         }
         if !matches!(install, Install::Ready(_)) {
             self.ffmpeg_help = Some(help::FfmpegHelp::new(install, Arc::clone(&self.notify)));
             return;
         }
-        self.info(format!("hardware: {}", capabilities.summary()));
+        self.info(crate::tr!("app-hardware", summary = capabilities.summary()));
         if capabilities.encoders.is_empty() {
-            self.error("FFmpeg runs, but none of its video encoders works on this computer");
+            self.error(crate::tr!("app-no-encoder"));
         }
         self.prefs.capabilities = Some(capabilities.clone());
         if capabilities != self.queue.capabilities {
@@ -430,10 +439,7 @@ impl TranscoderApp {
         if (known && !again) || self.measuring.is_some() {
             return;
         }
-        self.info(format!(
-            "measuring how many encodes {} runs at once…",
-            spec.name
-        ));
+        self.info(crate::tr!("app-measuring", encoder = spec.name.to_string()));
         self.queue.set_paused(true);
         let (sender, receiver) = crossbeam_channel::bounded(1);
         let notify = Arc::clone(&self.notify);
@@ -452,10 +458,10 @@ impl TranscoderApp {
         let (key, _) = self.measuring.take().expect("a measurement was running");
         self.queue.set_paused(false);
         let Some(count) = result else {
-            self.error("the encoder failed while measuring its parallel encodes");
+            self.error(crate::tr!("app-measure-failed"));
             return;
         };
-        self.info(format!("{key}: {count} encode(s) at once"));
+        self.info(crate::tr!("app-measured", key = key.clone(), count = count));
         self.prefs.measured_parallel = Some((key, count));
         if !self.prefs.parallel_manual && self.prefs.parallel_encodes != count {
             self.prefs.parallel_encodes = count;
@@ -748,22 +754,22 @@ impl TranscoderApp {
 
     fn menu_bar(&mut self, ui: &mut egui::Ui) {
         egui::MenuBar::new().ui(ui, |ui| {
-            ui.menu_button("File", |ui| {
-                if ui.button("Add videos…  (Ctrl+O)").clicked() {
+            ui.menu_button(crate::tr!("menu-file"), |ui| {
+                if ui.button(crate::tr!("menu-file-add-videos")).clicked() {
                     ui.close();
                     self.add_dialog();
                 }
                 if ui
                     .add_enabled(
                         !self.selection.is_empty(),
-                        egui::Button::new("Remove selected  (Del)"),
+                        egui::Button::new(crate::tr!("menu-file-remove-selected")),
                     )
                     .clicked()
                 {
                     ui.close();
                     self.remove_selected();
                 }
-                if ui.button("Remove encoded videos").clicked() {
+                if ui.button(crate::tr!("menu-file-remove-encoded")).clicked() {
                     ui.close();
                     self.selection = self
                         .queue
@@ -777,17 +783,17 @@ impl TranscoderApp {
                 ui.separator();
                 self.sendto_menu(ui);
                 ui.separator();
-                if ui.button("Quit").clicked() {
+                if ui.button(crate::tr!("menu-file-quit")).clicked() {
                     ui.ctx().send_viewport_cmd(egui::ViewportCommand::Close);
                 }
             });
-            ui.menu_button("Profiles", |ui| {
-                if ui.button("Edit profiles…").clicked() {
+            ui.menu_button(crate::tr!("menu-profiles"), |ui| {
+                if ui.button(crate::tr!("menu-profiles-edit")).clicked() {
                     ui.close();
                     self.show_profiles = true;
                 }
                 if let Some(path) = &self.profiles_path
-                    && ui.button("Open profiles.toml folder").clicked()
+                    && ui.button(crate::tr!("menu-profiles-open-folder")).clicked()
                 {
                     ui.close();
                     if let Some(dir) = path.parent() {
@@ -796,22 +802,22 @@ impl TranscoderApp {
                     }
                 }
             });
-            ui.menu_button("View", |ui| {
-                ui.checkbox(&mut self.show_log, "Log");
+            ui.menu_button(crate::tr!("menu-view"), |ui| {
+                ui.checkbox(&mut self.show_log, crate::tr!("menu-view-log"));
                 ui.menu_button(crate::tr!("menu-language"), |ui| self.language_menu(ui));
             });
-            ui.menu_button("Help", |ui| {
-                if ui.button("Keyboard shortcuts").clicked() {
+            ui.menu_button(crate::tr!("menu-help"), |ui| {
+                if ui.button(crate::tr!("menu-help-shortcuts")).clicked() {
                     ui.close();
                     self.show_shortcuts = true;
                 }
-                if ui.button("Documentation").clicked() {
+                if ui.button(crate::tr!("menu-help-documentation")).clicked() {
                     ui.close();
                     ui.ctx()
                         .open_url(egui::OpenUrl::new_tab(crate::build_info::documentation()));
                 }
                 ui.separator();
-                if ui.button("About Quick Video Transcoder").clicked() {
+                if ui.button(crate::tr!("menu-help-about")).clicked() {
                     ui.close();
                     self.show_about = true;
                 }
@@ -854,14 +860,17 @@ impl TranscoderApp {
                 .iter()
                 .filter(|j| matches!(j.phase, Phase::Done(_)))
                 .count();
-            ui.label(format!(
-                "{} video(s) · {encoding} encoding · {estimating} estimating · {done} done",
-                self.queue.jobs.len()
+            ui.label(crate::tr!(
+                "status-summary",
+                total = self.queue.jobs.len(),
+                encoding = encoding,
+                estimating = estimating,
+                done = done
             ));
             if self.detection.is_some() {
                 ui.separator();
                 ui.spinner();
-                ui.label("Detecting the encoders…");
+                ui.label(crate::tr!("status-detecting"));
             }
             if let Some((level, line)) = self.log.back() {
                 ui.separator();
@@ -903,26 +912,67 @@ impl TranscoderApp {
     }
 
     fn shortcuts_window(&mut self, ctx: &egui::Context) {
-        egui::Window::new("Keyboard shortcuts")
+        // A fixed id: the title changes with the language, and the window keeps its place.
+        egui::Window::new(crate::tr!("shortcuts-title"))
+            .id(egui::Id::unique("shortcuts window"))
             .open(&mut self.show_shortcuts)
             .resizable(false)
             .collapsible(false)
             .show(ctx, |ui| {
                 egui::Grid::new("shortcuts").striped(true).show(ui, |ui| {
                     for (keys, action) in [
-                        ("Space", "Play / pause the kept part"),
-                        ("Left / Right", "Previous / next frame"),
-                        ("Shift + Left / Right", "-1 s / +1 s"),
-                        ("Page Up / Down", "-10 s / +10 s"),
-                        ("I / O", "Start / end of the kept part at the current frame"),
-                        ("Home / End", "Go to the start / end of the kept part"),
-                        ("M", "Mute / unmute"),
-                        ("Ctrl + O", "Add videos"),
-                        ("Ctrl + A", "Select every video"),
-                        ("Ctrl + E", "Encode the selected videos"),
-                        ("Delete", "Remove the selected videos"),
-                        ("Drag a handle", "Move the start or end of the kept part"),
-                        ("Shift + drag", "Move the kept part as a whole"),
+                        (
+                            crate::tr!("shortcuts-play-keys"),
+                            crate::tr!("shortcuts-play-action"),
+                        ),
+                        (
+                            crate::tr!("shortcuts-step-keys"),
+                            crate::tr!("shortcuts-step-action"),
+                        ),
+                        (
+                            crate::tr!("shortcuts-second-keys"),
+                            crate::tr!("shortcuts-second-action"),
+                        ),
+                        (
+                            crate::tr!("shortcuts-ten-seconds-keys"),
+                            crate::tr!("shortcuts-ten-seconds-action"),
+                        ),
+                        (
+                            crate::tr!("shortcuts-trim-keys"),
+                            crate::tr!("shortcuts-trim-action"),
+                        ),
+                        (
+                            crate::tr!("shortcuts-goto-keys"),
+                            crate::tr!("shortcuts-goto-action"),
+                        ),
+                        (
+                            crate::tr!("shortcuts-mute-keys"),
+                            crate::tr!("shortcuts-mute-action"),
+                        ),
+                        (
+                            crate::tr!("shortcuts-add-keys"),
+                            crate::tr!("shortcuts-add-action"),
+                        ),
+                        (
+                            crate::tr!("shortcuts-select-all-keys"),
+                            crate::tr!("shortcuts-select-all-action"),
+                        ),
+                        (
+                            crate::tr!("shortcuts-encode-keys"),
+                            crate::tr!("shortcuts-encode-action"),
+                        ),
+                        (
+                            crate::tr!("shortcuts-delete-keys"),
+                            crate::tr!("shortcuts-delete-action"),
+                        ),
+                        (
+                            crate::tr!("shortcuts-handle-keys"),
+                            crate::tr!("shortcuts-handle-action"),
+                        ),
+                        (
+                            crate::tr!("shortcuts-shift-drag-keys"),
+                            crate::tr!("shortcuts-shift-drag-action"),
+                        ),
                     ] {
                         ui.monospace(keys);
                         ui.label(action);
@@ -944,13 +994,13 @@ impl TranscoderApp {
             })
             .collect();
         let title = if encoding.is_empty() {
-            format!("Quick Video Transcoder — {total} video(s)")
+            crate::tr!("title-idle", total = total)
         } else {
             let average = encoding.iter().sum::<f32>() / encoding.len() as f32;
-            format!(
-                "Quick Video Transcoder — encoding {} ({:.0} %)",
-                encoding.len(),
-                average * 100.0
+            crate::tr!(
+                "title-encoding",
+                count = encoding.len(),
+                percent = f64::from(average * 100.0)
             )
         };
         if title != self.title {
@@ -1010,8 +1060,8 @@ impl TranscoderApp {
             .any(|j| matches!(j.phase, Phase::Encoding(_) | Phase::Waiting));
         if ctx.input(|i| i.viewport().close_requested()) && running {
             let quit = rfd::MessageDialog::new()
-                .set_title("Encodes running")
-                .set_description("Closing stops the running encodes and deletes their partial files. Close anyway?")
+                .set_title(crate::tr!("dialog-close-title"))
+                .set_description(crate::tr!("dialog-close-description"))
                 .set_buttons(rfd::MessageButtons::YesNo)
                 .set_level(rfd::MessageLevel::Warning)
                 .show();
