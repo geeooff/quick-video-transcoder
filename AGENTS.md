@@ -71,6 +71,10 @@ tests/pipeline.rs   end to end on synthetic clips          examples/transcode.rs
 
 ## Workflow
 
+Project skills in `.claude/skills/`: **release**, **install-locally**, **upgrade-dependencies**, **localize** —
+the procedures this repository repeats, with their pitfalls. Use them; update them when a procedure changes.
+
+
 ```powershell
 .\scripts\build.ps1            # fmt, clippy -D warnings, rustdoc -D warnings, tests, doc links, no video / personal path
 .\scripts\build.ps1 build      # + optimized build, release-fast profile (thin LTO, ~20 s)
