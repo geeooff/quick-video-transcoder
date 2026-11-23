@@ -124,8 +124,11 @@ pub struct Profile {
     pub max_fps: f64,
     /// Lowest frame rate the size fitting may go down to.
     pub min_fps: f64,
-    /// Video codec.
-    pub codec: VideoCodec,
+    /// The codecs the destination plays, preferred first. The encode takes the first one with a hardware
+    /// encoder on this machine, else the first one with a software encoder
+    /// ([`crate::ffmpeg::hardware::Capabilities::choose`]). Version 0.1 files wrote a single `codec`.
+    #[serde(alias = "codec", deserialize_with = "one_or_many")]
+    pub codecs: Vec<VideoCodec>,
     /// Convert HDR sources to SDR. Off: an HDR source stays HDR (10-bit H.265 or AV1 only).
     pub sdr_only: bool,
     /// Curve used to convert HDR to SDR.
@@ -150,7 +153,8 @@ impl Default for Profile {
 
 impl Profile {
     /// The built-in profile, from the settings used for years with a `Send to` script: 720p 30 fps H.265
-    /// under 25 MB, SDR, 128 kbit/s AAC.
+    /// (else H.264) under 25 MB, SDR, 128 kbit/s AAC. No AV1: whether Messenger re-encodes it worse is not
+    /// measured yet (docs/messenger.md).
     pub fn messenger() -> Self {
         Self {
             name: "Messenger".to_owned(),
@@ -160,7 +164,7 @@ impl Profile {
             min_short_side: 360,
             max_fps: 30.0,
             min_fps: 24.0,
-            codec: VideoCodec::H265,
+            codecs: vec![VideoCodec::H265, VideoCodec::H264],
             sdr_only: true,
             tone_mapping: ToneMapping::Auto,
             audio_bitrate_kbps: 128,
@@ -170,9 +174,9 @@ impl Profile {
         }
     }
 
-    /// A Discord profile: H.265 up to 1080p60 (2160p60 with `max_short_side`), SDR, under `max_size_mb`.
-    /// Discord plays MP4 in H.264, HEVC or AV1 and checks the size before any compression; the desktop app
-    /// sends the file as is. See docs/discord.md.
+    /// A Discord profile: AV1, else H.265, else H.264, up to 1080p60 (2160p60 with `max_short_side`),
+    /// SDR, under `max_size_mb`. Discord plays MP4 in H.264, HEVC or AV1 and checks the size before any
+    /// compression; the desktop app sends the file as is. See docs/discord.md.
     fn discord(name: &str, max_size_mb: f64, max_short_side: u32, audio_bitrate_kbps: u32) -> Self {
         Self {
             name: name.to_owned(),
@@ -182,6 +186,7 @@ impl Profile {
             min_short_side: 360,
             max_fps: 60.0,
             min_fps: 24.0,
+            codecs: vec![VideoCodec::Av1, VideoCodec::H265, VideoCodec::H264],
             audio_bitrate_kbps,
             ..Self::messenger()
         }
@@ -233,12 +238,48 @@ impl Profile {
         self.audio_bitrate_kbps = self.audio_bitrate_kbps.clamp(32, 512);
         self.quality_ceiling = self.quality_ceiling.clamp(10, 45);
         self.quality_floor = self.quality_floor.clamp(self.quality_ceiling, 51);
-        if !self.sdr_only && self.codec == VideoCodec::H264 {
+        let mut seen = Vec::new();
+        self.codecs.retain(|codec| {
+            let first = !seen.contains(codec);
+            seen.push(*codec);
+            first
+        });
+        if self.codecs.is_empty() {
+            self.codecs = vec![VideoCodec::H265];
+            changes.push("no codec".to_owned());
+        }
+        if !self.sdr_only && !self.codecs.iter().any(|c| c.supports_hdr()) {
             self.sdr_only = true;
             changes.push("HDR needs H.265 or AV1: SDR only".to_owned());
         }
         changes
     }
+
+    /// The codec list as the UI shows it: `AV1 > H.265 > H.264`.
+    pub fn codecs_label(&self) -> String {
+        self.codecs
+            .iter()
+            .map(|c| c.label())
+            .collect::<Vec<_>>()
+            .join(" > ")
+    }
+}
+
+/// Reads a codec list written as one value (`codec = "h265"`, version 0.1) or as a list.
+fn one_or_many<'de, D>(deserializer: D) -> Result<Vec<VideoCodec>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum OneOrMany {
+        One(VideoCodec),
+        Many(Vec<VideoCodec>),
+    }
+    Ok(match OneOrMany::deserialize(deserializer)? {
+        OneOrMany::One(codec) => vec![codec],
+        OneOrMany::Many(codecs) => codecs,
+    })
 }
 
 /// The profiles file: an ordered list, the first one being the default for new videos.
@@ -361,14 +402,31 @@ mod tests {
             quality_floor: 20,
             min_short_side: 2000,
             sdr_only: false,
-            codec: VideoCodec::H264,
+            codecs: vec![VideoCodec::H264, VideoCodec::H264],
             ..Profile::messenger()
         };
         let changes = profile.sanitize();
         assert_eq!(profile.quality_floor, 30);
         assert_eq!(profile.min_short_side, 720);
+        assert_eq!(profile.codecs, [VideoCodec::H264]);
         assert!(profile.sdr_only);
         assert_eq!(changes.len(), 1, "{changes:?}");
+        let mut empty = Profile {
+            codecs: Vec::new(),
+            ..Profile::messenger()
+        };
+        empty.sanitize();
+        assert_eq!(empty.codecs, [VideoCodec::H265]);
+    }
+
+    #[test]
+    fn reads_a_single_codec_from_older_files() {
+        let set = ProfileSet::parse("[[profile]]\nname = \"Old\"\ncodec = \"av1\"\n").unwrap();
+        assert_eq!(set.profiles[0].codecs, [VideoCodec::Av1]);
+        let set = ProfileSet::parse("[[profile]]\nname = \"New\"\ncodecs = [\"av1\", \"h264\"]\n")
+            .unwrap();
+        assert_eq!(set.profiles[0].codecs, [VideoCodec::Av1, VideoCodec::H264]);
+        assert_eq!(set.profiles[0].codecs_label(), "AV1 > H.264");
     }
 
     #[test]

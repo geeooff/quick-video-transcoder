@@ -20,7 +20,7 @@ Measuring the size fitting on a real video, without the window (the video is onl
 must exist and differ from the video's):
 
 ```powershell
-cargo run --release --example transcode -- <video> [output folder] [size limit in MB]
+cargo run --release --example transcode -- <video> [output folder or -] [size limit in MB or -] [built-in profile name]
 ```
 
 ## Rules

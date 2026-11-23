@@ -93,6 +93,41 @@ impl Capabilities {
             .map(|backend| encoders::find(codec, backend))
     }
 
+    /// The encoder for a profile's codecs (preferred first):
+    /// - with a `preferred` backend (the user's choice in the settings), the first codec it encodes;
+    /// - else the first codec with a hardware encoder, on its best hardware backend: a laptop encoding AV1
+    ///   on NVENC and H.265 on Quick Sync gets AV1 on NVENC for `AV1 > H.265`;
+    /// - else the first codec with a software encoder.
+    ///
+    /// Hardware wins over the list's order only through this fallback: a codec the destination plays and
+    /// the GPU encodes is always taken over a slower CPU encode of a preferred one (an RTX 3080 has no AV1
+    /// encoder, so `AV1 > H.265` gives H.265 on NVENC there).
+    pub fn choose(
+        &self,
+        codecs: &[VideoCodec],
+        preferred: Option<EncoderBackend>,
+    ) -> Option<&'static EncoderSpec> {
+        let on = |backend: EncoderBackend| {
+            codecs
+                .iter()
+                .find(|&&c| self.has_encoder(c, backend))
+                .map(|&c| encoders::find(c, backend))
+        };
+        if let Some(found) = preferred.and_then(on) {
+            return Some(found);
+        }
+        codecs
+            .iter()
+            .find_map(|&codec| {
+                EncoderBackend::ALL
+                    .into_iter()
+                    .filter(|&b| b != EncoderBackend::Software)
+                    .find(|&b| self.has_encoder(codec, b))
+                    .map(|b| encoders::find(codec, b))
+            })
+            .or_else(|| on(EncoderBackend::Software))
+    }
+
     /// Working backends for a codec, best first.
     pub fn backends(&self, codec: VideoCodec) -> Vec<EncoderBackend> {
         EncoderBackend::ALL
@@ -345,6 +380,48 @@ mod tests {
             caps.backends(VideoCodec::H265),
             [EncoderBackend::Nvenc, EncoderBackend::Software]
         );
+    }
+
+    #[test]
+    fn chooses_the_first_codec_with_hardware_then_software() {
+        use EncoderBackend::*;
+        use VideoCodec::*;
+        let caps = |pairs: &[(VideoCodec, EncoderBackend)]| Capabilities {
+            encoders: pairs.to_vec(),
+            placebo: true,
+            detected: true,
+        };
+        let pick = |caps: &Capabilities, codecs: &[VideoCodec], preferred| {
+            caps.choose(codecs, preferred).map(|s| s.name)
+        };
+        let discord = [Av1, H265, H264];
+        // A laptop: AV1 on NVENC, H.265 on Quick Sync, everything on the CPU.
+        let laptop = caps(&[
+            (Av1, Nvenc),
+            (H265, Qsv),
+            (H264, Qsv),
+            (Av1, Software),
+            (H265, Software),
+            (H264, Software),
+        ]);
+        assert_eq!(pick(&laptop, &discord, None), Some("av1_nvenc"));
+        assert_eq!(pick(&laptop, &[H265, H264], None), Some("hevc_qsv"));
+        // An RTX 3080: no AV1 encoder in hardware, so H.265 on NVENC rather than AV1 on the CPU.
+        let rtx3080 = caps(&[
+            (H265, Nvenc),
+            (H264, Nvenc),
+            (Av1, Software),
+            (H265, Software),
+        ]);
+        assert_eq!(pick(&rtx3080, &discord, None), Some("hevc_nvenc"));
+        // No hardware at all: the first codec the CPU encodes.
+        let cpu = caps(&[(H265, Software), (H264, Software)]);
+        assert_eq!(pick(&cpu, &discord, None), Some("libx265"));
+        // The user's backend wins when it encodes one of the codecs, else the rule applies.
+        assert_eq!(pick(&laptop, &discord, Some(Software)), Some("libsvtav1"));
+        assert_eq!(pick(&laptop, &discord, Some(Qsv)), Some("hevc_qsv"));
+        assert_eq!(pick(&rtx3080, &discord, Some(Amf)), Some("hevc_nvenc"));
+        assert_eq!(pick(&caps(&[]), &discord, None), None);
     }
 
     #[test]

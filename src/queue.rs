@@ -368,7 +368,7 @@ impl Queue {
         job.media.as_ref()?;
         let encoder = self
             .capabilities
-            .encoder(job.profile.codec, self.settings.backend)?;
+            .choose(&job.profile.codecs, self.settings.backend)?;
         Some(EstimateKey {
             profile: job.profile.clone(),
             start: job.trim.start,
@@ -504,7 +504,7 @@ impl Queue {
             engine: job.engine?,
             encoder: self
                 .capabilities
-                .encoder(job.profile.codec, self.settings.backend)?,
+                .choose(&job.profile.codecs, self.settings.backend)?,
         })
     }
 

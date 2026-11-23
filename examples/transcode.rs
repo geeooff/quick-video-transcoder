@@ -2,7 +2,7 @@
 //! the UI: for measuring the size fitting on real captures.
 //!
 //! ```text
-//! cargo run --release --example transcode -- <video> [output folder] [size limit in MB]
+//! cargo run --release --example transcode -- <video> [output folder or -] [size limit in MB or -] [built-in profile name]
 //! ```
 //!
 //! The video is only read. The output folder must already exist and differ from the video's folder, so a
@@ -28,10 +28,14 @@ fn main() -> Result<()> {
     let mut args = std::env::args_os().skip(1);
     let video = PathBuf::from(
         args.next()
-            .context("usage: transcode <video> [output folder] [MB]")?,
+            .context("usage: transcode <video> [output folder or -] [MB or -] [profile]")?,
     );
-    let out_dir = args.next().map(PathBuf::from);
+    let out_dir = args
+        .next()
+        .map(PathBuf::from)
+        .filter(|p| p.as_os_str() != "-");
     let limit: Option<f64> = args.next().and_then(|a| a.to_string_lossy().parse().ok());
+    let profile_name = args.next().map(|a| a.to_string_lossy().into_owned());
 
     let capabilities = Capabilities::detect();
     println!("{}", capabilities.summary());
@@ -46,7 +50,13 @@ fn main() -> Result<()> {
         placebo: capabilities.placebo,
         vulkan_decode: capabilities.placebo && hardware::vulkan_decodes(&video),
     };
-    let mut profile = Profile::messenger();
+    let mut profile = match &profile_name {
+        Some(name) => Profile::built_ins()
+            .into_iter()
+            .find(|p| p.name == *name)
+            .with_context(|| format!("no built-in profile named {name}"))?,
+        None => Profile::messenger(),
+    };
     if let Some(limit) = limit {
         profile.max_size_mb = limit;
     }
@@ -58,14 +68,15 @@ fn main() -> Result<()> {
         end: media.duration,
         engine,
         encoder: capabilities
-            .encoder(profile.codec, None)
+            .choose(&profile.codecs, None)
             .context("no H.265 encoder")?,
     };
     let cancel = Arc::new(AtomicBool::new(false));
     let started = Instant::now();
     let estimate = estimate::run(&request, &Slots::new(4), &cancel)?;
     println!(
-        "estimate ({}, {:.1} s, {} measurements): {} at {:.0} kbit/s, QP {:.1} ({}), {:?}, predicted {} bytes",
+        "estimate ({}, {}, {:.1} s, {} measurements): {} at {:.0} kbit/s, QP {:.1} ({}), {:?}, predicted {} bytes",
+        request.encoder.name,
         engine.label(),
         started.elapsed().as_secs_f64(),
         estimate.measurements,

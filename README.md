@@ -17,7 +17,9 @@ and any video FFmpeg reads.
   is, then picks the best target that fits the limit: it lowers the frame rate, then the resolution, only
   when the quality would otherwise fall too low, and stops spending bytes once more would not show.
 - **Profiles.** A profile is a destination's limits: size, resolution, frame rate, codec, SDR only or not,
-  sound. Built-in profiles: *Messenger* (720p, 30 fps, H.265, under 25 MB) and *Discord* for each
+  sound. A profile lists the codecs the destination plays, preferred first, and the application takes the
+  first one your GPU encodes (the CPU only when no GPU encoder handles any). Built-in profiles:
+  *Messenger* (720p, 30 fps, H.265 then H.264, under 25 MB) and *Discord* (AV1, H.265, H.264) for each
   upload limit (20 MB, 50 MB, 100 MB, 1 GB). Edit any setting on one or
   several selected videos, and save it as a new profile.
 - **HDR to SDR done right.** An HDR capture is tone mapped on the GPU by libplacebo, with peak detection
@@ -73,7 +75,7 @@ max_short_side = 720
 min_short_side = 360
 max_fps = 30.0
 min_fps = 24.0
-codec = "h265"
+codecs = ["h265", "h264"]
 sdr_only = true
 tone_mapping = "auto"
 audio_bitrate_kbps = 128
@@ -87,7 +89,9 @@ kind = "auto"
 Sizes are megabytes of 1,000,000 bytes. Qualities are H.265 QPs, lower is better: `quality_ceiling` is the
 best quality worth its bytes, `quality_floor` the worst accepted before lowering the frame rate or the
 resolution. `audio` is `auto` (the game's track, not the microphone), `mix-all`, `none`, or
-`{ kind = "track", track = 1 }` (tracks count from 0).
+`{ kind = "track", track = 1 }` (tracks count from 0). `codecs` lists `av1`, `h265` and `h264` in order of
+preference: the first one a GPU encoder handles is used, else the first one the CPU handles (files written
+with a single `codec = "h265"` still load).
 
 Does Messenger keep 1080p60, or re-encode AV1? Meta does not say: see [Messenger's limits](docs/messenger.md)
 for what is documented and how to measure it.

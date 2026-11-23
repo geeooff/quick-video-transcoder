@@ -21,6 +21,10 @@ refuses a tag without one.
   25 MB) and for each Discord upload limit: 20 MB, 50 MB (Nitro Basic, server level 2), 100 MB (server
   level 3) and 1 GB (Nitro). Settings can be changed on several selected videos at once and saved as a
   profile; *Profiles → Edit profiles* adds back a built-in profile.
+- Each profile lists the codecs its destination plays, preferred first, and the encode takes the first one
+  a GPU encoder handles, falling back to the CPU only when none does: the Discord profiles encode AV1 on
+  GPUs that have an AV1 encoder (RTX 40 series) and H.265 on the others, Messenger H.265. The *Codec*
+  menu shows which codec and encoder a video gets.
 - HDR to SDR tone mapping on the GPU with libplacebo, and the CPU filters when it is not available.
 - The sound is the game's track by default, not the microphone: the first track whose name is not a
   microphone or a voice chat. The *Sound* menu lists each track with its name, as players show it
