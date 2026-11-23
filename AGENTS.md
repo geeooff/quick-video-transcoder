@@ -77,6 +77,8 @@ tests/pipeline.rs   end to end on synthetic clips          examples/transcode.rs
   but one thread, ~1 min 45 s) is what users get: tags, main's CI. `release-fast` (thin LTO, 16 units,
   ~20 s, exe ~12 % larger) is for checks: `build.ps1 build` and pull request CI (`release -Fast`). Never
   publish a `-Fast` build. Measured 2026-11-23 on a Ryzen 9 9950X3D: fat LTO cannot use more threads.
+  CI caches are scoped: a pull request reads main's cache and never saves its own on an exact key match,
+  so main's CI also builds `release-fast`, only to put its dependencies in the cache.
 
 - **One file.** A release is `quick-video-transcoder.exe` alone: static C runtime, icon, third-party
   notices (`--licenses`, *About*) inside. FFmpeg stays outside, found on the `PATH` or installed with
