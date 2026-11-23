@@ -100,13 +100,13 @@ pub struct Estimate {
 }
 
 /// A word for an H.265 QP, for people who do not think in QPs.
-pub fn quality_word(qp: f64) -> &'static str {
+pub fn quality_word(qp: f64) -> String {
     match qp {
-        q if q < 22.0 => "excellent",
-        q if q < 26.0 => "very good",
-        q if q < 30.0 => "good",
-        q if q < 34.0 => "fair",
-        _ => "poor",
+        q if q < 22.0 => crate::tr!("estimate-quality-excellent"),
+        q if q < 26.0 => crate::tr!("estimate-quality-very-good"),
+        q if q < 30.0 => crate::tr!("estimate-quality-good"),
+        q if q < 34.0 => crate::tr!("estimate-quality-fair"),
+        _ => crate::tr!("estimate-quality-poor"),
     }
 }
 
@@ -139,7 +139,7 @@ pub fn solve(
     mut measure: impl FnMut(Target, f64) -> Result<f64>,
 ) -> Result<(Target, f64, f64, Verdict, usize)> {
     if ladder.is_empty() {
-        bail!("no output size to try");
+        bail!(crate::tr!("estimate-no-size"));
     }
     let start_qp = ((bounds.ceiling + bounds.floor) / 2.0).round();
     let mut measurements = 0;
@@ -306,15 +306,15 @@ impl EstimateRequest {
 pub fn run(request: &EstimateRequest, slots: &Slots, cancel: &Arc<AtomicBool>) -> Result<Estimate> {
     let duration = request.duration();
     if duration < 0.2 {
-        bail!("the trimmed range is empty");
+        bail!(crate::tr!("estimate-empty-range"));
     }
     let audio = plan::audio_kbps(&request.media, &request.profile);
     let Some(budget_bps) = plan::video_budget(request.profile.max_bytes(), duration, audio) else {
-        bail!(
-            "{:.0} MB cannot even hold the sound of {}: shorten the clip",
-            request.profile.max_size_mb,
-            timecode::format_short(duration, false)
-        );
+        bail!(crate::tr!(
+            "estimate-too-small",
+            mb = request.profile.max_size_mb,
+            duration = timecode::format_short(duration, false)
+        ));
     };
     let ladder = plan::ladder(
         request.media.width,
@@ -453,7 +453,7 @@ fn encode_sample(
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .context("cannot start ffmpeg (is FFmpeg on the PATH?)")?;
+        .with_context(|| crate::tr!("media-ffmpeg-start-failed"))?;
     let mut stderr = StderrTail::collect(&mut child);
     let mut stdout = child.stdout.take().context("no ffmpeg stdout")?;
     let mut buffer = vec![0u8; 1 << 16];
@@ -474,14 +474,12 @@ fn encode_sample(
     let status = child.wait().context("ffmpeg did not exit")?;
     if !status.success() || bytes == 0 {
         let detail = stderr.finish();
-        bail!(
-            "sample encode failed ({status}): {}",
-            if detail.is_empty() {
-                "no output"
-            } else {
-                &detail
-            }
-        );
+        let status = status.to_string();
+        bail!(if detail.is_empty() {
+            crate::tr!("estimate-sample-failed-silent", status = status)
+        } else {
+            crate::tr!("estimate-sample-failed", status = status, detail = detail)
+        });
     }
     Ok(bytes)
 }

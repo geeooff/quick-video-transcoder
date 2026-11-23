@@ -248,7 +248,7 @@ pub fn install_with_winget() -> anyhow::Result<()> {
         .arg("--disable-interactivity")
         .stdin(std::process::Stdio::null())
         .output()
-        .context("cannot start winget")?;
+        .with_context(|| crate::tr!("media-winget-start-failed"))?;
     if output.status.success() {
         return Ok(());
     }
@@ -260,7 +260,11 @@ pub fn install_with_winget() -> anyhow::Result<()> {
         .filter(|l| l.chars().any(char::is_alphanumeric))
         .collect();
     let tail = lines[lines.len().saturating_sub(3)..].join(" / ");
-    anyhow::bail!("winget failed ({}): {tail}", output.status)
+    anyhow::bail!(crate::tr!(
+        "media-winget-failed",
+        status = output.status.to_string(),
+        detail = tail
+    ))
 }
 
 /// The major version in `ffmpeg -version`'s first line (`ffmpeg version 9.0.2-full_build-www.gyan.dev

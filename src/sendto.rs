@@ -39,37 +39,43 @@ pub fn is_installed() -> bool {
 
 /// Writes the shortcut to the running executable, replacing an older one (after a move of the folder).
 pub fn install() -> Result<PathBuf> {
-    let link = shortcut_path().context("no Send to folder on this system")?;
-    let exe = std::env::current_exe().context("cannot find this executable")?;
-    let folder = exe.parent().context("the executable has no folder")?;
+    let link = shortcut_path().with_context(|| crate::tr!("sendto-no-folder"))?;
+    let exe = std::env::current_exe().with_context(|| crate::tr!("sendto-no-executable"))?;
+    let folder = exe
+        .parent()
+        .with_context(|| crate::tr!("sendto-no-exe-folder"))?;
+    // The description travels in an environment variable too, like the paths: no quoting can break.
     let script = "$link = (New-Object -ComObject WScript.Shell).CreateShortcut($env:QVT_LINK); \
                   $link.TargetPath = $env:QVT_TARGET; \
                   $link.WorkingDirectory = $env:QVT_FOLDER; \
-                  $link.Description = 'Trim and re-encode videos to fit a size limit'; \
+                  $link.Description = $env:QVT_DESCRIPTION; \
                   $link.Save()";
     let output = crate::ffmpeg::tool("powershell.exe")
         .args(["-NoProfile", "-NonInteractive", "-Command", script])
         .env("QVT_LINK", &link)
         .env("QVT_TARGET", &exe)
         .env("QVT_FOLDER", folder)
+        .env("QVT_DESCRIPTION", crate::tr!("sendto-shortcut-description"))
         .stdin(Stdio::null())
         .output()
-        .context("cannot start PowerShell")?;
+        .with_context(|| crate::tr!("sendto-start-failed"))?;
     if !output.status.success() || !link.is_file() {
-        bail!(
-            "cannot create {}: {}",
-            link.display(),
-            String::from_utf8_lossy(&output.stderr).trim()
-        );
+        bail!(crate::tr!(
+            "sendto-create-failed",
+            path = link.display().to_string(),
+            detail = String::from_utf8_lossy(&output.stderr).trim().to_owned()
+        ));
     }
     Ok(link)
 }
 
 /// Deletes the shortcut, if it is there.
 pub fn remove() -> Result<()> {
-    let link = shortcut_path().context("no Send to folder on this system")?;
+    let link = shortcut_path().with_context(|| crate::tr!("sendto-no-folder"))?;
     if link.is_file() {
-        std::fs::remove_file(&link).with_context(|| format!("cannot delete {}", link.display()))?;
+        std::fs::remove_file(&link).with_context(|| {
+            crate::tr!("sendto-delete-failed", path = link.display().to_string())
+        })?;
     }
     Ok(())
 }

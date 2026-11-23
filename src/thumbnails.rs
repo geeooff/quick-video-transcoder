@@ -142,14 +142,14 @@ fn decode(
         .args(&args)
         .stdin(Stdio::null())
         .output()
-        .context("cannot run ffmpeg")?;
+        .with_context(|| crate::tr!("media-ffmpeg-start-failed"))?;
     let expected = (size.width * size.height * 4) as usize;
     if output.stdout.len() < expected {
-        bail!(
-            "no frame ({}): {}",
-            output.status,
-            String::from_utf8_lossy(&output.stderr).trim()
-        );
+        bail!(crate::tr!(
+            "media-no-frame",
+            status = output.status.to_string(),
+            detail = String::from_utf8_lossy(&output.stderr).trim().to_owned()
+        ));
     }
     let mut rgba = output.stdout;
     rgba.truncate(expected);

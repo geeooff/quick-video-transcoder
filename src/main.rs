@@ -35,6 +35,9 @@ fn main() {
         Some("--licenses") => return print(build_info::NOTICES),
         _ => {}
     }
+    // The message boxes below run before the window: they follow the OS language (the app applies the
+    // stored choice once it starts).
+    quick_video_transcoder::i18n::apply(None);
     let data = profile::data_dir();
     // Before the log: a launch that only hands its files over must not rotate the open window's log.
     let incoming = match data.as_deref().map(|dir| instance::claim(dir, &arguments)) {
@@ -72,11 +75,10 @@ fn main() {
     if let Err(error) = result {
         log::error!("the window could not open: {error}");
         show_error(
-            "Quick Video Transcoder cannot open its window",
-            &format!(
-                "{error}\n\nThe window needs a graphics driver with DirectX 12 or Vulkan. Updating the \
-                 graphics driver usually fixes this.{}",
-                log_hint(log_path.as_deref())
+            &quick_video_transcoder::tr!("startup-window-failed-title"),
+            &with_log_hint(
+                quick_video_transcoder::tr!("startup-window-failed", detail = error.to_string()),
+                log_path.as_deref(),
             ),
         );
         std::process::exit(1);
@@ -124,19 +126,25 @@ fn install_panic_hook(log_path: Option<PathBuf>) {
         default(info);
         if std::thread::current().name() == Some("main") {
             show_error(
-                "Quick Video Transcoder has stopped",
-                &format!(
-                    "Something went wrong: {info}\n\nEncodes that were running did not finish.{}",
-                    log_hint(log_path.as_deref())
+                &quick_video_transcoder::tr!("startup-stopped-title"),
+                &with_log_hint(
+                    quick_video_transcoder::tr!("startup-stopped", detail = info.to_string()),
+                    log_path.as_deref(),
                 ),
             );
         }
     }));
 }
 
-fn log_hint(path: Option<&Path>) -> String {
-    path.map(|p| format!("\n\nDetails are in {}", p.display()))
-        .unwrap_or_default()
+/// The message with a last paragraph naming the log file, when there is one.
+fn with_log_hint(text: String, path: Option<&Path>) -> String {
+    match path {
+        Some(path) => format!(
+            "{text}\n\n{}",
+            quick_video_transcoder::tr!("startup-log-hint", path = path.display().to_string())
+        ),
+        None => text,
+    }
 }
 
 fn show_error(title: &str, text: &str) {

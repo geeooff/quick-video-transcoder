@@ -87,9 +87,9 @@ impl FrameRate {
     pub fn label(self) -> String {
         let fps = self.as_f64();
         if (fps - fps.round()).abs() < 0.005 {
-            format!("{}", fps.round())
+            crate::tr!("plan-rate-whole", fps = fps.round())
         } else {
-            format!("{fps:.2}")
+            crate::tr!("plan-rate-fraction", fps = fps)
         }
     }
 }

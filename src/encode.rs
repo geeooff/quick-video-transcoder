@@ -157,7 +157,10 @@ pub fn run(
     let partial = partial_path(output);
     check_partial(&partial, output, &request.path)?;
     if output.exists() {
-        bail!("{} already exists", output.display());
+        bail!(crate::tr!(
+            "encode-output-exists",
+            path = output.display().to_string()
+        ));
     }
     let max_bytes = request.profile.max_bytes();
     let duration = request.duration();
@@ -183,11 +186,14 @@ pub fn run(
             return Err(error);
         }
         let bytes = std::fs::metadata(&partial)
-            .with_context(|| format!("cannot read {}", partial.display()))?
+            .with_context(|| {
+                crate::tr!("encode-cannot-read", path = partial.display().to_string())
+            })?
             .len();
         if bytes <= max_bytes {
-            std::fs::rename(&partial, output)
-                .with_context(|| format!("cannot rename the encode to {}", output.display()))?;
+            std::fs::rename(&partial, output).with_context(|| {
+                crate::tr!("encode-cannot-rename", path = output.display().to_string())
+            })?;
             log::info!(
                 "encoded {} -> {} ({bytes} bytes, attempt {attempt})",
                 request.path.display(),
@@ -210,11 +216,11 @@ pub fn run(
         video_bps /= overshoot;
     }
     let _ = remove_partial(&partial, output, &request.path);
-    bail!(
-        "the encoder overshot {:.1} MB {} times: lower the quality floor or shorten the clip",
-        request.profile.max_size_mb,
-        RETRIES + 1
-    )
+    bail!(crate::tr!(
+        "encode-overshoot",
+        mb = request.profile.max_size_mb,
+        count = ((RETRIES + 1) as u32)
+    ))
 }
 
 fn remove_partial(partial: &Path, output: &Path, source: &Path) -> Result<()> {
@@ -241,7 +247,7 @@ fn run_once(
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .context("cannot start ffmpeg (is FFmpeg on the PATH?)")?;
+        .with_context(|| crate::tr!("media-ffmpeg-start-failed"))?;
     let mut stderr = StderrTail::collect(&mut child);
     let stdout = child.stdout.take().context("no ffmpeg stdout")?;
     let (tx, rx) = crossbeam_channel::unbounded();
@@ -282,14 +288,12 @@ fn run_once(
     let _ = reader.join();
     if !status.success() {
         let detail = stderr.finish();
-        bail!(
-            "ffmpeg failed ({status}): {}",
-            if detail.is_empty() {
-                "no message"
-            } else {
-                &detail
-            }
-        );
+        let status = status.to_string();
+        bail!(if detail.is_empty() {
+            crate::tr!("encode-ffmpeg-failed-silent", status = status)
+        } else {
+            crate::tr!("encode-ffmpeg-failed", status = status, detail = detail)
+        });
     }
     Ok(())
 }
