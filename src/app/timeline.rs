@@ -30,106 +30,133 @@ impl TranscoderApp {
         ui.add_space(6.0);
     }
 
+    /// The volume is laid out first, at the right edge, and the controls take what remains, wrapping to a
+    /// second row when a longer language (or a narrow window) does not fit: nothing overlaps the volume.
     fn transport(&mut self, ui: &mut egui::Ui, duration: f64, trim: Trim) {
-        ui.horizontal(|ui| {
-            if ui
-                .button("⏮")
-                .on_hover_text(crate::tr!("timeline-first-tooltip"))
-                .clicked()
-            {
-                self.player.seek(trim.start);
-            }
-            if ui
-                .button("◀|")
-                .on_hover_text(crate::tr!("timeline-previous-tooltip"))
-                .clicked()
-            {
-                self.player.step(-1);
-            }
-            let play = if self.player.is_playing() {
-                "⏸"
-            } else {
-                "▶"
-            };
-            if ui
-                .add(
-                    egui::Button::new(egui::RichText::new(play).size(16.0))
-                        .min_size(vec2(36.0, 0.0)),
-                )
-                .on_hover_text(crate::tr!("timeline-play-tooltip"))
-                .clicked()
-            {
-                self.toggle_playback();
-            }
-            if ui
-                .button("|▶")
-                .on_hover_text(crate::tr!("timeline-next-tooltip"))
-                .clicked()
-            {
-                self.player.step(1);
-            }
-            if ui
-                .button("⏭")
-                .on_hover_text(crate::tr!("timeline-last-tooltip"))
-                .clicked()
-            {
-                self.player.seek(trim.end);
-            }
-            ui.separator();
-            ui.monospace(format!(
-                "{} / {}",
-                timecode::format_precise(self.player.position()),
-                timecode::format_short(duration, true)
-            ));
-            ui.separator();
-            if ui
-                .button(crate::tr!("timeline-start-here"))
-                .on_hover_text(crate::tr!("timeline-start-here-tooltip"))
-                .clicked()
-            {
-                self.set_trim_start(self.player.position());
-            }
-            if ui
-                .button(crate::tr!("timeline-end-here"))
-                .on_hover_text(crate::tr!("timeline-end-here-tooltip"))
-                .clicked()
-            {
-                self.set_trim_end(self.player.position());
-            }
-            // The kept duration is shown in the settings panel and the queue row: here it collided with the
-            // volume slider once egui 0.37 drew the transport symbols as wider color emoji.
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                ui.spacing_mut().slider_width = 90.0;
-                let available = self.player.has_audio();
-                ui.add_enabled_ui(available, |ui| {
-                    let volume = ui
-                        .add(egui::Slider::new(&mut self.prefs.volume, 0.0..=1.0).show_value(false))
-                        .on_hover_text(crate::tr!(
-                            "timeline-volume-tooltip",
-                            percent = (self.prefs.volume * 100.0).round()
-                        ));
-                    if volume.changed() {
-                        self.prefs.muted = false;
-                    }
-                    let icon = if self.prefs.muted || !available {
-                        "🔇"
-                    } else {
-                        "🔊"
-                    };
-                    if ui
-                        .add(egui::Button::new(icon).selected(self.prefs.muted))
-                        .on_hover_text(crate::tr!("timeline-mute-tooltip"))
-                        .clicked()
-                    {
-                        self.prefs.muted = !self.prefs.muted;
-                    }
-                })
-                .response
-                .on_disabled_hover_text(crate::tr!("timeline-no-sound"));
-            });
-        });
+        // The two sides are built by two closures alive at once: the volume works on copies.
+        let mut volume = Volume {
+            level: self.prefs.volume,
+            muted: self.prefs.muted,
+            available: self.player.has_audio(),
+        };
+        egui::containers::Sides::new().shrink_left().show(
+            ui,
+            |ui| {
+                ui.horizontal_wrapped(|ui| self.transport_controls(ui, duration, trim));
+            },
+            |ui| volume.show(ui),
+        );
+        self.prefs.volume = volume.level;
+        self.prefs.muted = volume.muted;
     }
 
+    fn transport_controls(&mut self, ui: &mut egui::Ui, duration: f64, trim: Trim) {
+        if ui
+            .button("⏮")
+            .on_hover_text(crate::tr!("timeline-first-tooltip"))
+            .clicked()
+        {
+            self.player.seek(trim.start);
+        }
+        if ui
+            .button("◀|")
+            .on_hover_text(crate::tr!("timeline-previous-tooltip"))
+            .clicked()
+        {
+            self.player.step(-1);
+        }
+        let play = if self.player.is_playing() {
+            "⏸"
+        } else {
+            "▶"
+        };
+        if ui
+            .add(egui::Button::new(egui::RichText::new(play).size(16.0)).min_size(vec2(36.0, 0.0)))
+            .on_hover_text(crate::tr!("timeline-play-tooltip"))
+            .clicked()
+        {
+            self.toggle_playback();
+        }
+        if ui
+            .button("|▶")
+            .on_hover_text(crate::tr!("timeline-next-tooltip"))
+            .clicked()
+        {
+            self.player.step(1);
+        }
+        if ui
+            .button("⏭")
+            .on_hover_text(crate::tr!("timeline-last-tooltip"))
+            .clicked()
+        {
+            self.player.seek(trim.end);
+        }
+        ui.separator();
+        ui.monospace(format!(
+            "{} / {}",
+            timecode::format_precise(self.player.position()),
+            timecode::format_short(duration, true)
+        ));
+        ui.separator();
+        if ui
+            .button(crate::tr!("timeline-start-here"))
+            .on_hover_text(crate::tr!("timeline-start-here-tooltip"))
+            .clicked()
+        {
+            self.set_trim_start(self.player.position());
+        }
+        if ui
+            .button(crate::tr!("timeline-end-here"))
+            .on_hover_text(crate::tr!("timeline-end-here-tooltip"))
+            .clicked()
+        {
+            self.set_trim_end(self.player.position());
+        }
+    }
+}
+
+/// The volume controls' state, edited apart from the app while the transport row is built.
+struct Volume {
+    level: f32,
+    muted: bool,
+    available: bool,
+}
+
+impl Volume {
+    /// Mute button and volume slider, right to left (the kept duration lives in the settings panel and the
+    /// queue row, not here).
+    fn show(&mut self, ui: &mut egui::Ui) {
+        ui.spacing_mut().slider_width = 90.0;
+        let available = self.available;
+        ui.add_enabled_ui(available, |ui| {
+            let slider = ui
+                .add(egui::Slider::new(&mut self.level, 0.0..=1.0).show_value(false))
+                .on_hover_text(crate::tr!(
+                    "timeline-volume-tooltip",
+                    percent = (self.level * 100.0).round()
+                ));
+            if slider.changed() {
+                self.muted = false;
+            }
+            let icon = if self.muted || !available {
+                "🔇"
+            } else {
+                "🔊"
+            };
+            if ui
+                .add(egui::Button::new(icon).selected(self.muted))
+                .on_hover_text(crate::tr!("timeline-mute-tooltip"))
+                .clicked()
+            {
+                self.muted = !self.muted;
+            }
+        })
+        .response
+        .on_disabled_hover_text(crate::tr!("timeline-no-sound"));
+    }
+}
+
+impl TranscoderApp {
     fn trim_bar(&mut self, ui: &mut egui::Ui, id: u64, duration: f64, fps: f64, trim: Trim) {
         let width = ui.available_width();
         let (rect, response) =

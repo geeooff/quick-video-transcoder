@@ -20,3 +20,6 @@
 *.ts
 *.m2ts
 *.qvt-partial
+
+# Worktrees of Claude Code subagents.
+/.claude/worktrees/

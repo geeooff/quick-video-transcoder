@@ -674,7 +674,7 @@ impl TranscoderApp {
             if ui
                 .add_enabled(
                     settings.output_dir.is_some(),
-                    egui::Button::new(crate::tr!("settings-output-next-to-video")),
+                    egui::Button::new(crate::tr!("settings-output-use-next-to-video")),
                 )
                 .clicked()
             {

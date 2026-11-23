@@ -153,7 +153,10 @@ settings-estimate-budget = Budget: { NUM($kbps) } kbit/s of video
 settings-estimate-filters = Filters: { $engine }
 
 # Output section: where the files go, and the encoder settings.
+# Shown in place of the output folder when there is none: each output goes in its source's folder.
 settings-output-next-to-video = Next to each video
+# Button that goes back to writing each output next to its source (enabled when a folder is chosen).
+settings-output-use-next-to-video = Next to each video
 settings-output-choose-folder = Choose folder…
 settings-output-folder-dialog-title = Output folder
 settings-encoder = Encoder
