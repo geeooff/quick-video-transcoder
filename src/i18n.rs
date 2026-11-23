@@ -270,6 +270,17 @@ mod tests {
         }
     }
 
+    /// French is complete: a message added in English must be translated in the same change (regional
+    /// files stay partial on purpose).
+    #[test]
+    fn french_is_complete() {
+        let files = files();
+        let english: BTreeSet<String> = messages(&files["en"]).into_keys().collect();
+        let french: BTreeSet<String> = messages(&files["fr"]).into_keys().collect();
+        let missing: Vec<&String> = english.difference(&french).collect();
+        assert!(missing.is_empty(), "not translated in French: {missing:?}");
+    }
+
     /// Every English message is used by the code, so the file holds no dead text to translate.
     #[test]
     fn every_message_is_used() {

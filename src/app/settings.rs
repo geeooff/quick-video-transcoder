@@ -223,7 +223,9 @@ impl TranscoderApp {
                         .range(0.5..=4000.0)
                         .speed(0.5)
                         .max_decimals(1)
-                        .suffix(format!(" {}", crate::tr!("settings-unit-mb"))),
+                        // Shown and typed in the user's format ("25,0 Mo"): either separator is read.
+                        .custom_formatter(|mb, _| crate::tr!("settings-size-value", mb = mb))
+                        .custom_parser(parse_localized_number),
                 )
                 .on_hover_text(crate::tr!("settings-size-limit-tooltip"));
                 ui.end_row();
@@ -887,8 +889,27 @@ fn audio_label(choice: AudioChoice, media: Option<&crate::ffmpeg::probe::MediaIn
     }
 }
 
+/// A number typed in a number box, in any locale's format: the digits, and a comma or a point as the
+/// decimal separator ("25,5 Mo", "25.5", "1 000"). Grouping spaces and units are ignored.
+fn parse_localized_number(text: &str) -> Option<f64> {
+    let kept: String = text
+        .chars()
+        .filter(|c| c.is_ascii_digit() || matches!(c, ',' | '.' | '-'))
+        .map(|c| if c == ',' { '.' } else { c })
+        .collect();
+    kept.parse().ok()
+}
+
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn number_boxes_read_either_decimal_separator() {
+        assert_eq!(super::parse_localized_number("25,5 Mo"), Some(25.5));
+        assert_eq!(super::parse_localized_number("25.5 MB"), Some(25.5));
+        assert_eq!(super::parse_localized_number("1\u{202f}000"), Some(1000.0));
+        assert_eq!(super::parse_localized_number("MB"), None);
+    }
+
     use super::*;
 
     #[test]

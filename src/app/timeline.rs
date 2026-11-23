@@ -126,7 +126,7 @@ impl Volume {
     /// Mute button and volume slider, right to left (the kept duration lives in the settings panel and the
     /// queue row, not here).
     fn show(&mut self, ui: &mut egui::Ui) {
-        ui.spacing_mut().slider_width = 90.0;
+        ui.spacing_mut().slider_width = 70.0;
         let available = self.available;
         ui.add_enabled_ui(available, |ui| {
             let slider = ui

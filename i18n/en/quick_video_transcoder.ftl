@@ -61,8 +61,8 @@ settings-profile-save-tooltip = Keep these settings as a profile for later video
 # Row labels of the settings grid.
 settings-size-limit = Size limit
 settings-size-limit-tooltip = Megabytes of 1,000,000 bytes
-# Unit shown after the size limit value (a number box: "25 MB"), megabytes of 1,000,000 bytes.
-settings-unit-mb = MB
+# The size limit in its number box ("25.0 MB"); megabytes of 1,000,000 bytes.
+settings-size-value = { NUM($mb, decimals: 1) } MB
 settings-resolution = Resolution
 # Picker text for the resolution ceiling. $short is the short side of the picture in pixels, e.g. 720 (shown as 720p).
 settings-resolution-up-to = up to { $short }p
@@ -109,7 +109,7 @@ settings-best-worth-it-tooltip = Past this quality the extra bytes are not visib
 settings-worst-accepted = Worst accepted
 settings-worst-accepted-tooltip = Below this quality the frame rate, then the resolution, are lowered
 # Value of a quality slider. QP is the quantization parameter (lower is better). $qp is its number, $word a short
-# description of that quality, such as "good" (English words from the estimate, not yet translated).
+# description of that quality, such as "good" (one of the estimate-quality-* messages, already translated).
 settings-quality-value = QP { NUM($qp) } ({ $word })
 settings-lowest-resolution = Lowest resolution
 settings-lowest-frame-rate = Lowest frame rate
@@ -400,9 +400,9 @@ about-documentation = Documentation
 about-documentation-link = for this version
 # Label of a row; its value is a link to the change history file (CHANGELOG.md).
 about-changes = Changes
-about-licence = Licence
+about-licence = License
 about-built-with = Built with
-about-third-party-link = third-party libraries and their licences
+about-third-party-link = third-party libraries and their licenses
 about-notices-no-folder = no data folder to open the third-party notices from
 # $path: the file that could not be written; $detail: the technical reason.
 about-notices-failed = cannot write { $path }: { $detail }
@@ -417,7 +417,7 @@ ffmpeg-installing = Installing FFmpeg with winget: a minute or two…
 # winget is Windows' package manager. $package: the winget package identifier.
 ffmpeg-winget-offer = It can be installed for you with winget, Windows' package manager: the { $package } package (gyan.dev's full build, about 100 MB, for your account only).
 ffmpeg-install-button = Install FFmpeg for me
-ffmpeg-licence-note = Installing accepts the package's licence (GPL) and the winget source's terms.
+ffmpeg-licence-note = Installing accepts the package's license (GPL) and the winget source's terms.
 # Introduces the manual steps below it.
 ffmpeg-or-yourself = Or install it yourself:
 ffmpeg-looking-for-winget = Looking for winget…
