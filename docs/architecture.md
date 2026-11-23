@@ -61,11 +61,16 @@ filters, and keeps the engine that worked; the preview switches to the software 
 
 Two encodes saturate the card (two NVENC engines). The engine count varies within a generation (one
 NVENC on an RTX 3080, two on an RTX 4090, per NVIDIA's support matrix) and no tool reports it, so the
-application measures it (`hardware::measure_parallel_encodes`): 1, 2, 3… encodes of a synthetic 1080p60
-picture at once, until one more adds less than half of what one encode does alone. About 7 s, once per
-GPU, driver and encoder; new estimates and encodes wait meanwhile, and the result sets *Encodes at once*
-unless the user set it by hand. Measured 2026-11-23 with `hevc_nvenc` p7 on the RTX 4090: 146, 289 and
-302 frames/s for 1, 2 and 3 encodes, so 2.
+application measures it (`hardware::measure_parallel_encodes`): 1, 2, 3 and 4 encodes of a synthetic
+1080p60 picture at once, and the fewest that reach 85 % of the best total. About 12 s, once per GPU,
+driver and encoder; new estimates and encodes wait meanwhile, and the result sets *Encodes at once*
+unless the user set it by hand.
+
+The whole curve is measured because the driver chooses the engine of each session: with `hevc_nvenc` p7
+on the RTX 4090, the same driver (621.24) gave 146, 289 and 302 frames/s for 1 to 3 encodes on
+2026-11-20 (2), then 147, 205 and 295 on 2026-11-23, reproduced with FFmpeg alone (3: the first two
+sessions shared one engine, the second engine started with the third). The first rule, stop when one
+more encode adds less than half of one alone, read the second curve as 1.
 
 ## Frame rates
 
