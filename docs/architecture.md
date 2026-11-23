@@ -146,6 +146,18 @@ statically (`.cargo/config.toml`). The script then asks the built executable for
 notices, and writes the executable, `SHA256SUMS.txt` and `notes.md` (the changelog section) to `dist\`.
 `release.yml` runs it on a `v*` tag, requires `notes.md`, attests `SHA256SUMS.txt` and publishes.
 
+Build time (Ryzen 9 9950X3D, 16 cores, rustc 1.98, 2026-11-23, after a commit, dependencies cached):
+
+| Profile | Final step | Exe |
+| --- | --- | --- |
+| `release`: fat LTO, 1 codegen unit (published) | 1 min 43 s | 18.7 MB |
+| fat LTO, 16 codegen units | 2 min 09 s | 19.5 MB |
+| `release-fast`: thin LTO, 16 codegen units (checks) | 22 s | 21.0 MB |
+
+Fat LTO merges the whole program and its dependencies into one LLVM module optimized on one thread; more
+codegen units only make the merge slower, and a faster linker (`rust-lld`) saves under a second. So the
+published profile stays fat, and checks (`build.ps1 build`, pull request CI) use `release-fast`.
+
 When FFmpeg is missing and winget runs, the *FFmpeg is needed* window offers to run
 `winget install --id Gyan.FFmpeg --exact --silent` with the package and source agreements accepted (the
 window says so), then checks again with the `PATH` re-read.

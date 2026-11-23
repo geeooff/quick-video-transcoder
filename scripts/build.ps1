@@ -4,15 +4,21 @@
 # drift apart.
 #
 #   .\scripts\build.ps1            # test (the default)
-#   .\scripts\build.ps1 build      # test, then the release build
-#   .\scripts\build.ps1 release    # test, notices, release build, the .exe and its checksum in dist\ (from a clean tree outside CI)
+#   .\scripts\build.ps1 build          # test, then an optimized build with the release-fast profile (thin LTO)
+#   .\scripts\build.ps1 release        # test, notices, the published build (fat LTO), the .exe and its checksum in dist\
+#   .\scripts\build.ps1 release -Fast  # the same with release-fast: pull request CI
+#
+# A release is built from a clean tree outside CI, always without -Fast.
 #
 # Never pipe it into Select-Object -First: that stops the pipeline mid-run, and a truncated run can look
 # like a success. Read the whole output, or the last line.
 
 param(
     [ValidateSet('test', 'build', 'release')]
-    [string] $Task = 'test'
+    [string] $Task = 'test',
+    # release only: build with the release-fast profile (thin LTO, every core) instead of the published
+    # one. For pull request CI, which checks the packaging without the minutes of a fat LTO.
+    [switch] $Fast
 )
 
 $ErrorActionPreference = 'Stop'
@@ -157,7 +163,7 @@ function Invoke-Tests {
 
 # A release build embeds the third-party notices: generated here by cargo-about into target\, handed to
 # build.rs through QVT_NOTICES. A plain build embeds a placeholder.
-function Invoke-Build([switch] $WithNotices) {
+function Invoke-Build([string] $CargoProfile, [switch] $WithNotices) {
     if ($WithNotices) {
         Step "Third-party notices"
         if (-not (Get-Command cargo-about -ErrorAction SilentlyContinue)) {
@@ -169,8 +175,8 @@ function Invoke-Build([switch] $WithNotices) {
         Write-Host "    $([math]::Round((Get-Item $notices).Length / 1KB)) KB"
         $env:QVT_NOTICES = $notices
     }
-    Step "Release build"
-    try { Run 'cargo' @('build', '--release', '--locked') } finally { Remove-Item Env:\QVT_NOTICES -ErrorAction SilentlyContinue }
+    Step "Optimized build ($CargoProfile profile)"
+    try { Run 'cargo' @('build', '--profile', $CargoProfile, '--locked') } finally { Remove-Item Env:\QVT_NOTICES -ErrorAction SilentlyContinue }
 }
 
 # Starts the built executable with one argument and returns what it printed. A windowed program:
@@ -202,10 +208,10 @@ function Assert-CleanTree {
 # documentation inside (About, --licenses, --version). Its name carries no version, so replacing the file
 # updates it and the Send to shortcut keeps working. Next to it in dist\: SHA256SUMS.txt, and notes.md
 # (the changelog section) when the version has a dated one.
-function Invoke-Package {
+function Invoke-Package([string] $CargoProfile) {
     $version = Get-Version
     $dist = Join-Path $root 'dist'
-    $exe = Join-Path $root 'target\release\quick-video-transcoder.exe'
+    $exe = Join-Path $root "target\$CargoProfile\quick-video-transcoder.exe"
 
     # Asked of the executable rather than of git: it is what users run.
     Step "The executable names its commit and carries its notices"
@@ -243,7 +249,13 @@ function Invoke-Package {
 
 if ($Task -eq 'release') { Assert-CleanTree }
 Invoke-Tests
-if ($Task -eq 'build') { Invoke-Build }
-if ($Task -eq 'release') { Invoke-Build -WithNotices; Invoke-Package }
+if ($Fast -and $Task -ne 'release') { Fail "-Fast only applies to the release task" }
+if ($Task -eq 'build') { Invoke-Build 'release-fast' }
+if ($Task -eq 'release') {
+    $cargoProfile = if ($Fast) { 'release-fast' } else { 'release' }
+    Invoke-Build $cargoProfile -WithNotices
+    Invoke-Package $cargoProfile
+    if ($Fast) { Write-Host "    built with release-fast: a check, not an executable to publish" -ForegroundColor Yellow }
+}
 Write-Host ""
 Write-Host "$Task OK" -ForegroundColor Green

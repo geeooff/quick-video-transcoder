@@ -61,10 +61,12 @@ jobs:
       # The same checklist a developer runs: fmt, clippy -D warnings, rustdoc -D warnings, tests,
       # documentation links, no video or personal path tracked, then the release executable (with its
       # commit and third-party notices inside) and its checksum. One script, so CI and a developer's
-      # machine cannot drift apart.
+      # machine cannot drift apart. A pull request builds it with the release-fast profile (thin LTO on
+      # every core, minutes faster); main, after each merge, with the published fat LTO profile, so the
+      # profile a tag uses is built on every change before any release.
       - name: Test and build the release executable
         shell: pwsh
-        run: .\scripts\build.ps1 release
+        run: .\scripts\build.ps1 release ${{ github.event_name == 'pull_request' && '-Fast' || '' }}
 
       - name: Read the version
         id: version
