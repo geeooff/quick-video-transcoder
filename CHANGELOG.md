@@ -15,6 +15,12 @@ refuses a tag without one.
 - Numbers follow the chosen language and region: `25,0 Mo` in French, the Canadian and Swiss groupings,
   `25.0 MB` in English. The size limit box accepts a comma or a point.
 
+### Fixed
+
+- *Encodes at once* is measured from 1 to 4 encodes and takes the fewest that reach the best speed: the
+  NVIDIA driver can run the first two encodes on one engine and start the second engine only with a
+  third, which the measurement read as a single engine (an RTX 4090 got 1 instead of 3).
+
 ## [1.0.0] - 2026-11-23
 
 The first release.
