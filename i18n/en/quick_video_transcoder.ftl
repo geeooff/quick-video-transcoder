@@ -466,7 +466,7 @@ estimate-quality-poor = poor
 estimate-no-size = no output size to try
 estimate-empty-range = the trimmed range is empty
 # $mb: the size limit in megabytes. $duration: the kept part's length as a time code.
-estimate-too-small = { NUM($mb, decimals: 0) } MB cannot even hold the sound of { $duration }: shorten the clip
+estimate-too-small = { NUM($mb, decimals: 0) } MB cannot even hold the sound of { $duration }: shorten the kept part
 # $status: FFmpeg's exit status (data). $detail: FFmpeg's own message (technical, English).
 estimate-sample-failed = sample encode failed ({ $status }): { $detail }
 estimate-sample-failed-silent = sample encode failed ({ $status }): no output
@@ -479,9 +479,9 @@ encode-cannot-rename = cannot rename the encode to { $path }
 # $mb: the size limit in megabytes. $count: how many times the encode was tried.
 encode-overshoot =
     the encoder overshot { NUM($mb, decimals: 1) } MB { $count ->
-        [one] 1 time
+        [one] { NUM($count) } time
        *[other] { NUM($count) } times
-    }: lower the quality floor or shorten the clip
+    }: lower the quality floor or shorten the kept part
 encode-ffmpeg-failed = ffmpeg failed ({ $status }): { $detail }
 encode-ffmpeg-failed-silent = ffmpeg failed ({ $status }): no message
 # Safety checks: the encode only writes its own partial file and never the source.

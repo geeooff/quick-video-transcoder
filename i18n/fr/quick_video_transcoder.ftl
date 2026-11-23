@@ -14,9 +14,9 @@ timeline-play-tooltip = Lire / mettre en pause la partie conservée (Espace)
 timeline-next-tooltip = Image suivante (Droite)
 timeline-last-tooltip = Fin de la partie conservée (Fin)
 timeline-start-here = [ Début ici
-timeline-start-here-tooltip = Faire commencer la partie conservée à l’image actuelle (I)
+timeline-start-here-tooltip = Placer le début de la partie conservée sur l’image actuelle (I)
 timeline-end-here = Fin ici ]
-timeline-end-here-tooltip = Faire finir la partie conservée après l’image actuelle (O)
+timeline-end-here-tooltip = Placer la fin de la partie conservée après l’image actuelle (O)
 timeline-volume-tooltip = Volume : { NUM($percent) } %
 timeline-mute-tooltip = Couper / rétablir le son (M)
 timeline-no-sound = Cette vidéo n’a pas de son
@@ -28,7 +28,7 @@ settings-heading-selected =
         [one] { NUM($count) } vidéo sélectionnée
        *[other] { NUM($count) } vidéos sélectionnées
     }
-settings-change-applies-to-all = Chaque modification s’applique à toutes
+settings-change-applies-to-all = Toute modification s’applique à chacune
 settings-no-video = Aucune vidéo sélectionnée
 
 settings-section-profile = Profil
@@ -75,23 +75,23 @@ settings-kbps-value = { NUM($kbps) } kbit/s
 
 settings-quality-bounds = Limites de qualité
 settings-best-worth-it = Maximum utile
-settings-best-worth-it-tooltip = Au-delà de cette qualité, les octets en plus ne se voient pas : un clip facile finit plus petit que la limite
+settings-best-worth-it-tooltip = Au-delà de cette qualité, les octets en plus ne se voient pas : un clip facile donne un fichier plus petit que la limite
 settings-worst-accepted = Minimum accepté
 settings-worst-accepted-tooltip = En dessous de cette qualité, la fréquence d’images, puis la résolution, sont réduites
 settings-quality-value = QP { NUM($qp) } ({ $word })
 settings-lowest-resolution = Résolution minimale
 settings-lowest-frame-rate = Fréquence minimale
-settings-file-name-suffix = Suffixe du fichier
+settings-file-name-suffix = Suffixe du nom
 
 settings-kept-part-multi-note = La partie conservée se règle vidéo par vidéo, sur la chronologie
 settings-trim-start = Début
 settings-trim-end = Fin
 settings-trim-duration = Durée
 settings-keep-everything = Tout garder
-settings-not-a-time = temps non valide : { $text }
+settings-not-a-time = « { $text } » n’est pas un temps valide
 
 settings-verdict-best-quality = Tient à la qualité maximale utile : le fichier sera plus petit que la limite
-settings-verdict-fitted = Remplit la taille maximale
+settings-verdict-fitted = Utilise toute la taille maximale
 settings-verdict-below-floor = Sous la qualité minimale acceptée, même aux réglages les plus bas : raccourcissez la partie conservée
 settings-estimate-output = Sortie
 settings-estimate-output-value = { $size } à { $fps } i/s ({ $target })
@@ -117,7 +117,7 @@ settings-output-folder-dialog-title = Dossier de sortie
 settings-encoder = Encodeur
 settings-encoder-automatic = Automatique
 settings-parallel-encodes = Encodages simultanés
-settings-parallel-measured-tooltip = Mesuré sur ce GPU : { $count } à la fois avant que les encodages se ralentissent (une RTX 4090 a deux moteurs NVENC, une RTX 3080 un seul)
+settings-parallel-measured-tooltip = Mesuré sur ce GPU : { $count } à la fois avant que les encodages ne se ralentissent entre eux (une RTX 4090 a deux moteurs NVENC, une RTX 3080 un seul)
 settings-parallel-not-measured-tooltip = Pas encore mesuré
 settings-parallel-measuring = mesure…
 settings-parallel-measured = mesuré : { $count }
@@ -137,8 +137,8 @@ profiles-add-built-in = Ajouter un profil intégré
 ## Preview (src/app/preview.rs)
 
 preview-info = Aperçu { $size } · source { $width }x{ $height } { $codec }
-preview-info-hdr-encoded = Aperçu { $size } · source { $width }x{ $height } { $codec } · { $dynamic } en mappage tonal, comme à l’encodage
-preview-info-hdr-kept = Aperçu { $size } · source { $width }x{ $height } { $codec } · { $dynamic } conservé, affiché en mappage tonal
+preview-info-hdr-encoded = Aperçu { $size } · source { $width }x{ $height } { $codec } · { $dynamic } converti en SDR, comme à l’encodage
+preview-info-hdr-kept = Aperçu { $size } · source { $width }x{ $height } { $codec } · { $dynamic } conservé, affiché en SDR
 preview-seeking = Recherche…
 preview-decoder-error = Décodeur : { $detail }
 preview-empty-queue = Déposez vos captures de jeu ici, ou ajoutez-les avec Ctrl+O
@@ -244,7 +244,11 @@ title-idle =
         [one] { NUM($total) } vidéo
        *[other] { NUM($total) } vidéos
     }
-title-encoding = Quick Video Transcoder — { NUM($count) } en encodage ({ NUM($percent) } %)
+title-encoding =
+    Quick Video Transcoder — { $count ->
+        [one] { NUM($count) } encodage en cours
+       *[other] { NUM($count) } encodages en cours
+    } ({ NUM($percent) } %)
 
 dialog-add-title = Ajouter des vidéos
 dialog-add-filter-videos = Vidéos
@@ -264,8 +268,8 @@ app-profiles-saved = profils enregistrés dans { $path }
 app-ffmpeg-missing = { $program } est introuvable dans le PATH
 app-ffmpeg-too-old = { $version } : il faut FFmpeg { NUM($required) } ou une version plus récente
 app-hardware = matériel : { $summary }
-app-no-encoder = FFmpeg fonctionne, mais aucun de ses encodeurs vidéo ne marche sur cet ordinateur
-app-measuring = mesure du nombre d’encodages simultanés de { $encoder }…
+app-no-encoder = FFmpeg fonctionne, mais aucun de ses encodeurs vidéo n’est utilisable sur cet ordinateur
+app-measuring = mesure du nombre d’encodages simultanés possibles avec { $encoder }…
 app-measure-failed = l’encodeur a échoué pendant la mesure des encodages simultanés
 app-measured =
     { $key } : { $count ->
@@ -283,7 +287,7 @@ app-files-received =
 
 sendto-menu-add = Ajouter au menu Envoyer vers de l’Explorateur
 sendto-menu-update = Mettre à jour le raccourci Envoyer vers
-sendto-menu-tooltip = Dans l’Explorateur, sélectionnez des vidéos, clic droit, Envoyer vers, Quick Video Transcoder
+sendto-menu-tooltip = Dans l’Explorateur, sélectionnez des vidéos, faites un clic droit, puis Envoyer vers > Quick Video Transcoder
 sendto-menu-remove = Retirer du menu Envoyer vers de l’Explorateur
 sendto-menu-written = Raccourci Envoyer vers créé : { $path }
 sendto-menu-removed = Raccourci Envoyer vers supprimé
@@ -305,7 +309,7 @@ ffmpeg-title = FFmpeg est nécessaire
 ffmpeg-missing = Quick Video Transcoder lit et encode les vidéos avec FFmpeg, un programme gratuit qu’il n’inclut pas, et { $program } est introuvable sur cet ordinateur.
 ffmpeg-too-old = La version de FFmpeg trouvée est trop ancienne ({ $version }). Il faut la version { NUM($required) } ou une version plus récente.
 ffmpeg-installing = Installation de FFmpeg avec winget : une minute ou deux…
-ffmpeg-winget-offer = Il peut être installé pour vous avec winget, le gestionnaire de paquets de Windows : le paquet { $package } (la version complète de gyan.dev, environ 100 Mo, pour votre compte uniquement).
+ffmpeg-winget-offer = Quick Video Transcoder peut l’installer pour vous avec winget, le gestionnaire de paquets de Windows : paquet { $package } (version complète de gyan.dev, environ 100 Mo, pour votre compte uniquement).
 ffmpeg-install-button = Installer FFmpeg pour moi
 ffmpeg-licence-note = L’installation vaut acceptation de la licence du paquet (GPL) et des conditions de la source winget.
 ffmpeg-or-yourself = Ou installez-le vous-même :
@@ -338,18 +342,18 @@ estimate-quality-fair = correcte
 estimate-quality-poor = médiocre
 estimate-no-size = aucune taille de sortie à essayer
 estimate-empty-range = la partie conservée est vide
-estimate-too-small = { NUM($mb, decimals: 0) } Mo ne suffisent même pas pour le son de { $duration } : raccourcissez le clip
+estimate-too-small = { NUM($mb, decimals: 0) } Mo ne suffisent même pas pour le son de { $duration } : raccourcissez la partie conservée
 estimate-sample-failed = échec de l’encodage d’essai ({ $status }) : { $detail }
 estimate-sample-failed-silent = échec de l’encodage d’essai ({ $status }) : aucune sortie
 
 encode-output-exists = { $path } existe déjà
 encode-cannot-read = impossible de lire { $path }
-encode-cannot-rename = impossible de renommer l’encodage en { $path }
+encode-cannot-rename = impossible de renommer le fichier encodé en { $path }
 encode-overshoot =
     l’encodeur a dépassé { NUM($mb, decimals: 1) } Mo { $count ->
         [one] { NUM($count) } fois
        *[other] { NUM($count) } fois
-    } : baissez la qualité minimale ou raccourcissez le clip
+    } : baissez la qualité minimale ou raccourcissez la partie conservée
 encode-ffmpeg-failed = échec de ffmpeg ({ $status }) : { $detail }
 encode-ffmpeg-failed-silent = échec de ffmpeg ({ $status }) : aucun message
 encode-refuse-partial = écriture de { $path } refusée : ce n’est pas un fichier partiel
