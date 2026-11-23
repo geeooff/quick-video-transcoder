@@ -11,6 +11,10 @@ updates:
     cooldown:
       default-days: 7
     groups:
+      # eframe and egui move together: egui is a direct dependency only for a feature, and a lone eframe
+      # bump would build two eguis and silently lose it. Before the other groups, so it wins.
+      egui:
+        patterns: ["eframe", "egui"]
       patches:
         update-types: [patch]
     commit-message:
