@@ -28,8 +28,9 @@ fn main() {
         .first()
         .is_some_and(|a| a.as_os_str() == "--version" || a.as_os_str() == "-V")
     {
-        // A release build has no console of its own, but a redirected output (a pipe, a file) works.
-        println!("{}", build_info::version_text());
+        // A release build has no console of its own, but a redirected output (a file, a pipe) works. A
+        // reader that already left (PowerShell does not wait for a windowed program) is no error.
+        let _ = writeln!(std::io::stdout(), "{}", build_info::version_text());
         return;
     }
     let data = profile::data_dir();

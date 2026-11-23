@@ -185,9 +185,16 @@ function Invoke-Package {
 
     # Asked of the executable rather than of git, so the readme cannot name a commit other than the one
     # compiled in.
+    # A windowed program: PowerShell does not wait for it when capturing its output, so it is started and
+    # waited for explicitly, its output going to a file of the staging folder.
     Step "The executable names its commit"
-    $stamp = @(& $exe --version)
-    if ($LASTEXITCODE -ne 0 -or $stamp.Count -lt 3) { Fail "quick-video-transcoder --version printed: $stamp" }
+    if (Test-Path $stage) { Remove-Item -Recurse -Force $stage }
+    New-Item -ItemType Directory -Force $stage | Out-Null
+    $stampFile = Join-Path $stage 'version.txt'
+    $process = Start-Process -FilePath $exe -ArgumentList '--version' -RedirectStandardOutput $stampFile -NoNewWindow -Wait -PassThru
+    $stamp = @(Get-Content $stampFile)
+    Remove-Item $stampFile
+    if ($process.ExitCode -ne 0 -or $stamp.Count -lt 3) { Fail "quick-video-transcoder --version printed: $stamp" }
     $commit = ($stamp | Select-String -Pattern '^commit:\s+(\S+)').Matches[0].Groups[1].Value
     $docLink = ($stamp | Select-String -Pattern '^documentation:\s+(\S+)').Matches[0].Groups[1].Value
     $head = (& git -C $root rev-parse HEAD).Trim()
@@ -196,8 +203,6 @@ function Invoke-Package {
     Write-Host "    $commit"
 
     Step "Package $version"
-    if (Test-Path $stage) { Remove-Item -Recurse -Force $stage }
-    New-Item -ItemType Directory -Force $stage | Out-Null
     Copy-Item $exe $stage
     Copy-Item (Join-Path $root 'LICENSE') (Join-Path $stage 'LICENSE.txt')
 

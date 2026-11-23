@@ -55,5 +55,6 @@ refuses a tag without one.
   system's colour emoji.
 - A GPU encoder is only used if it accepts the options the encode needs (B-frames, lookahead,
   multipass), so an older GPU no longer fails every estimate.
+- AV1 on the CPU (SVT-AV1) works: its encode was refused for a peak rate it does not support.
 - With only CPU encoders, the queue no longer pauses for minutes to measure parallel encodes: one encode
   at a time, which already uses every core.
