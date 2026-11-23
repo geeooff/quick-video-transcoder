@@ -7,6 +7,10 @@ refuses a tag without one.
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-11-23
+
+The first release.
+
 ### Added
 
 - A queue of videos, filled from the command line, Explorer's *Send to* menu or drag and drop, with a
@@ -29,9 +33,11 @@ refuses a tag without one.
 - The sound is the game's track by default, not the microphone: the first track whose name is not a
   microphone or a voice chat. The *Sound* menu lists each track with its name, as players show it
   ("System sounds", "Microphone"), and offers every track mixed or no sound.
+- Encoders are detected by trying them with the options the encode uses, so a GPU that cannot run them
+  falls back to another encoder instead of failing.
 - As many encodes at a time as the GPU runs without slowing down, measured once on each GPU and driver
-  in a few seconds (two on an RTX 4090), with a size check that re-encodes slightly lower if a file comes
-  out over the limit.
+  in a few seconds (two on an RTX 4090; one at a time on the CPU, which already uses every core), with a
+  size check that re-encodes slightly lower if a file comes out over the limit.
 - Variable frame rate captures keep their real rate: an Xbox HDR capture that FFmpeg reports at 56 fps
   is read as 59.94 fps and encoded at 29.97 fps, not 28.
 - *Copy* puts encoded files on the clipboard, ready to paste into a conversation; *Show* opens their
@@ -50,12 +56,5 @@ refuses a tag without one.
 - One file, nothing to install: the release is `quick-video-transcoder.exe` alone, the C runtime and the
   third-party licences inside (*Help → About*). Replacing the file updates it.
 
-### Fixed
-
-- The buttons' symbols are monochrome again, drawn with the window's own fonts instead of the
-  system's colour emoji.
-- A GPU encoder is only used if it accepts the options the encode needs (B-frames, lookahead,
-  multipass), so an older GPU no longer fails every estimate.
-- AV1 on the CPU (SVT-AV1) works: its encode was refused for a peak rate it does not support.
-- With only CPU encoders, the queue no longer pauses for minutes to measure parallel encodes: one encode
-  at a time, which already uses every core.
+[Unreleased]: https://github.com/Geeooff/quick-video-transcoder/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/Geeooff/quick-video-transcoder/releases/tag/v1.0.0
