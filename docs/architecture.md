@@ -19,6 +19,7 @@ on the GPU by libplacebo.
 | `src/ffmpeg/` | Probe, encoders, filters, hardware detection, preview decoder, audio decoder. |
 | `src/player.rs`, `src/audio.rs` | Preview playback with the sound as master clock (`cpal`). |
 | `src/thumbnails.rs` | The thumbnail strip, by parallel seeks. |
+| `src/update/`, `src/app/update_window.rs` | *Check for updates*: the release feed, the state machine, the download and the swap at exit. |
 | `src/instance.rs` | One window: a second launch hands its files to the open one. |
 | `src/sendto.rs` | The *Send to* shortcut. |
 | `src/build_info.rs`, `build.rs` | The version, the commit, links to the documentation of that commit; the icon and version block. |
@@ -120,7 +121,8 @@ out 0.03 % over the limit and was re-encoded once, to 97.4 % of it.
 
 ## Files written
 
-Next to the videos, only the output and its partial file. FFmpeg writes `<output>.qvt-partial`, checked by
+Beside the executable, only during an update the user asked for: `<exe>.new` and `<exe>.old`
+([Updating](updating.md)). Next to the videos, only the output and its partial file. FFmpeg writes `<output>.qvt-partial`, checked by
 `naming::check_partial` (same folder, marker extension, not the source) before every run; it is renamed
 once the size is checked, deleted otherwise. An output name that exists gets ` (2)`, ` (3)`…: nothing is
 ever overwritten. Source metadata (titles, encoder tags, chapters) is not copied.

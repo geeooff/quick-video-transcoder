@@ -23,3 +23,4 @@ pub mod queue;
 pub mod sendto;
 pub mod thumbnails;
 pub mod timecode;
+pub mod update;

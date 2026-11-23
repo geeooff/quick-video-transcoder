@@ -44,5 +44,8 @@ On `release/vX.Y.Z` from an up-to-date `main`:
 
 ## 4. After
 
-- Install it on this machine with the **install-locally** skill (from the release, attestation verified).
+- From 1.2.0 on, update this machine **as a user would**: *Help → Check for updates* in the installed
+  previous version, *Download and install*, *Restart now*; then the new version must show *Updated to X.Y.Z*
+  and `--version` the tag's commit (docs/updating.md, "Measured"). Record the timings there. Otherwise, or
+  if it fails, install with the **install-locally** skill (from the release, attestation verified).
 - Report to the maintainer: the release URL, what it contains, what was not verified (other GPUs, Linux).

@@ -14,6 +14,7 @@ mod preview;
 mod queue_panel;
 mod settings;
 mod timeline;
+mod update_window;
 
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::path::{Path, PathBuf};
@@ -140,6 +141,10 @@ pub struct TranscoderApp {
     /// The *Send to* shortcut exists (checked at start and after each change).
     sendto_installed: bool,
     show_about: bool,
+    /// *Help → Check for updates* and its window.
+    updater: update_window::Updater,
+    /// The swap script is started: close the window at the next frame.
+    close_for_update: bool,
     /// The GPU drawing the window and its driver: with the encoder, the key of a parallelism measurement.
     gpu: String,
     /// A running measurement of encodes at once, and its key.
@@ -219,6 +224,8 @@ impl TranscoderApp {
             incoming,
             sendto_installed: crate::sendto::is_installed(),
             show_about: false,
+            updater: update_window::Updater::new(),
+            close_for_update: false,
             gpu: cc
                 .wgpu_render_state
                 .as_ref()
@@ -822,6 +829,10 @@ impl TranscoderApp {
                         .open_url(egui::OpenUrl::new_tab(crate::build_info::documentation()));
                 }
                 ui.separator();
+                if ui.button(crate::tr!("menu-help-updates")).clicked() {
+                    ui.close();
+                    self.open_updates();
+                }
                 if ui.button(crate::tr!("menu-help-about")).clicked() {
                     ui.close();
                     self.show_about = true;
@@ -1166,6 +1177,7 @@ impl eframe::App for TranscoderApp {
         self.handle_dropped_files(&ctx);
         self.handle_shortcuts(&ctx);
         self.poll_incoming(&ctx);
+        self.poll_updates();
         self.poll_queue();
         self.poll_thumbnails(&ctx);
         self.update_player(&ctx);
@@ -1198,6 +1210,10 @@ impl eframe::App for TranscoderApp {
         self.shortcuts_window(&ctx);
         self.profiles_window(&ctx);
         self.about_window(&ctx);
+        self.update_window(&ctx);
+        if self.close_for_update {
+            ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+        }
         self.ffmpeg_window(&ctx);
         self.take_screenshot(&ctx);
     }

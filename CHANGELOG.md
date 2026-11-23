@@ -14,6 +14,9 @@ refuses a tag without one.
   without restarting.
 - Numbers follow the chosen language and region: `25,0 Mo` in French, the Canadian and Swiss groupings,
   `25.0 MB` in English. The size limit box accepts a comma or a point.
+- *Help → Check for updates*: shows the latest version and what changed, downloads it, checks it against
+  the published checksums, and restarts on it — the previous version comes back if anything fails. The
+  application connects only when you click.
 
 ### Fixed
 

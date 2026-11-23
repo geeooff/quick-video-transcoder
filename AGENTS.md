@@ -54,6 +54,8 @@ tests/pipeline.rs   end to end on synthetic clips          examples/transcode.rs
 - Spawn FFmpeg with `ffmpeg::tool()` or `background_tool()` (no console window); collect stderr with
   `StderrTail::finish()` after exit; stop with `kill_tree` (Chocolatey and Scoop shims).
 - Never hard-code an encoder: go through `Capabilities::encoder`. H.265 stays the default codec.
+- The network is used only when the user clicks *Check for updates* (docs/updating.md): never a
+  background check. Updater tests never call GitHub (scripted feed, local listener).
 - Every text a user reads is a Fluent message: `crate::tr!("id")`, numbers through `NUM` in the message
   (docs/localization.md). Logs and technical details stay in English.
 - Qualities are H.265 QPs everywhere; `EncoderSpec::qp` converts for AV1 scales.
