@@ -30,24 +30,35 @@ Nothing is ever overwritten: an output name that exists gets ` (2)`, and the sou
 
 ## Requirements
 
-- Windows 10 or 11 (64-bit). Linux and macOS build, but are not tested.
-- [FFmpeg](https://ffmpeg.org/download.html) 7 or later on the `PATH`, for instance the *full* build from
-  [gyan.dev](https://www.gyan.dev/ffmpeg/builds/) or `winget install Gyan.FFmpeg`. GPU tone mapping needs
-  an FFmpeg built with libplacebo and Vulkan (the gyan.dev full build is); without it the CPU filters are
-  used.
-- A GPU encoder makes it fast: NVIDIA NVENC, Intel Quick Sync or AMD AMF. The CPU encoders work too.
+- Windows 10 or 11 (64-bit), with a graphics driver supporting DirectX 12 or Vulkan. Linux and macOS
+  build, but are not tested.
+- [FFmpeg](https://ffmpeg.org/download.html) 7 or later, a separate free program. If it is missing, the
+  application says so and, when Windows' package manager winget is there, offers to install it for you
+  (the `Gyan.FFmpeg` package, for your account only); it is then found without signing out. To install it
+  yourself: `winget install --id Gyan.FFmpeg -e` in Terminal, or the *release full* build from
+  [gyan.dev](https://www.gyan.dev/ffmpeg/builds/) with its `bin` folder added to the `Path`. GPU tone
+  mapping needs an FFmpeg built with libplacebo and Vulkan (the gyan.dev full build is); without it the
+  CPU filters are used.
+- A GPU encoder makes it fast: NVIDIA NVENC, Intel Quick Sync or AMD AMF. The CPU encoders work too,
+  slowly. **Tested on NVIDIA GPUs only**: Quick Sync and AMF are detected and used, but have not been
+  tried on real hardware yet.
 
 ## Install
 
-1. Download the zip from the [latest release](https://github.com/Geeooff/quick-video-transcoder/releases/latest)
-   and extract it where you keep your tools.
-2. To add it to Explorer's *Send to* menu, run the script that comes with it:
+Nothing to install: the program is one file.
 
-   ```powershell
-   .\install-sendto.ps1
-   ```
+1. Download `quick-video-transcoder.exe` from the
+   [latest release](https://github.com/Geeooff/quick-video-transcoder/releases/latest) and put it where
+   you keep your tools.
+2. Start it. The program is not signed, so the first time Windows may show *Windows protected your PC*:
+   click *More info*, then *Run anyway*. To check the download first, compare it with `SHA256SUMS.txt` on
+   the release page, or verify where it was built with
+   `gh attestation verify quick-video-transcoder.exe --repo Geeooff/quick-video-transcoder`.
+3. *File → Add to Explorer's Send to menu*. Moved the file? Do it again: the shortcut follows.
+   *File → Remove from Explorer's Send to menu* takes it away.
 
-   `.\install-sendto.ps1 -Remove` takes it away.
+To update, replace the file with the new one (same name: the *Send to* shortcut keeps working). Only one
+window opens: videos sent while it is open join its queue.
 
 ## Use
 
@@ -59,7 +70,15 @@ Nothing is ever overwritten: an output name that exists gets ` (2)`, and the sou
    application measures it once, in a few seconds, the first time it runs on a GPU.
 5. *Copy* on an encoded video, then paste it into the conversation.
 
-Keyboard shortcuts are under *Help*.
+Keyboard shortcuts are under *Help*, with *About* (the version, and this documentation as it was for
+that version).
+
+## When something goes wrong
+
+The application keeps a log of its last two runs in its data folder (*Profiles → Open profiles.toml
+folder*): `quick-video-transcoder.log` and `quick-video-transcoder.previous.log`. *View → Log* shows the
+current one in the window. If the window cannot open or the application stops, a message says why and
+names the log; attach it to an [issue](https://github.com/Geeooff/quick-video-transcoder/issues).
 
 ## Profiles
 
@@ -109,4 +128,6 @@ for what is documented and how to measure it.
 
 ## License
 
-MIT. See [LICENSE](LICENSE). FFmpeg is not included; it has its own licenses.
+MIT. See [LICENSE](LICENSE). The libraries built in are listed with their licences in the program
+(*Help → About*, *third-party libraries and their licences*). FFmpeg is not included; it has its own
+licenses.

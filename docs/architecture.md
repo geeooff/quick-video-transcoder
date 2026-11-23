@@ -19,6 +19,10 @@ on the GPU by libplacebo.
 | `src/ffmpeg/` | Probe, encoders, filters, hardware detection, preview decoder, audio decoder. |
 | `src/player.rs`, `src/audio.rs` | Preview playback with the sound as master clock (`cpal`). |
 | `src/thumbnails.rs` | The thumbnail strip, by parallel seeks. |
+| `src/instance.rs` | One window: a second launch hands its files to the open one. |
+| `src/sendto.rs` | The *Send to* shortcut. |
+| `src/build_info.rs`, `build.rs` | The version, the commit, links to the documentation of that commit; the icon and version block. |
+| `src/main.rs` | Arguments, the log file, the crash message, the window. |
 
 ## The filters
 
@@ -111,7 +115,37 @@ out 0.03 % over the limit and was re-encoded once, to 97.4 % of it.
 
 ## Files written
 
-Only the output and its partial file. FFmpeg writes `<output>.qvt-partial`, checked by
+Next to the videos, only the output and its partial file. FFmpeg writes `<output>.qvt-partial`, checked by
 `naming::check_partial` (same folder, marker extension, not the source) before every run; it is renamed
 once the size is checked, deleted otherwise. An output name that exists gets ` (2)`, ` (3)`…: nothing is
 ever overwritten. Source metadata (titles, encoder tags, chapters) is not copied.
+
+In the data folder (`eframe::storage_dir`): `profiles.toml`, eframe's saved preferences, the logs of the
+last two runs (`quick-video-transcoder.log`, `.previous.log`) and `instance.txt`, the loopback port and
+random token through which a second launch hands its files to the open window (`instance`). In the user's
+*Send to* folder, `Quick Video Transcoder.lnk`, only when the user adds or removes it from the *File*
+menu (`sendto`).
+
+## Startup
+
+FFmpeg is checked first (`ffmpeg::Install::check`): `ffmpeg` and `ffprobe` must run and be version 7 or
+later. When they are not on the inherited `PATH`, the `PATH` is read again from the user's and the
+system's settings, so FFmpeg installed after Explorer started is found without signing out. Then every
+encoder FFmpeg was built with is tried in parallel with the options the estimate and the encode use
+(constant QP, then the bitrate rate control with B-frames, lookahead and multipass) on a small picture:
+a bare encode test passes on GPUs that then refuse those options. The parallel encodes are measured for
+GPU encoders only; with a CPU encoder, one at a time.
+
+## Releases
+
+A release is one file, `quick-video-transcoder.exe`. `build.rs` stamps the commit into it, embeds the
+third-party notices that `scripts/build.ps1 release` generates with `cargo about` (passed in
+`QVT_NOTICES`), and compiles in the icon and the version block (`rc.exe`); the C runtime is linked
+statically (`.cargo/config.toml`). The script then asks the built executable for its commit
+(`--version`) and notices (`--licenses`), refuses a commit that differs from the checkout or missing
+notices, and writes the executable, `SHA256SUMS.txt` and `notes.md` (the changelog section) to `dist\`.
+`release.yml` runs it on a `v*` tag, requires `notes.md`, attests `SHA256SUMS.txt` and publishes.
+
+When FFmpeg is missing and winget runs, the *FFmpeg is needed* window offers to run
+`winget install --id Gyan.FFmpeg --exact --silent` with the package and source agreements accepted (the
+window says so), then checks again with the `PATH` re-read.

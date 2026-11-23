@@ -231,14 +231,17 @@ impl EncoderSpec {
             }
             EncoderBackend::Qsv | EncoderBackend::Software => {}
         }
-        args.extend([
-            "-b:v".into(),
-            rate(1.0),
-            "-maxrate:v".into(),
-            rate(2.0),
-            "-bufsize:v".into(),
-            rate(4.0),
-        ]);
+        args.extend(["-b:v".into(), rate(1.0)]);
+        // SVT-AV1 refuses a peak rate outside its CRF mode ("Max Bitrate only supported with CRF mode"):
+        // its VBR keeps the average alone.
+        if !(self.backend == EncoderBackend::Software && self.codec == VideoCodec::Av1) {
+            args.extend([
+                "-maxrate:v".into(),
+                rate(2.0),
+                "-bufsize:v".into(),
+                rate(4.0),
+            ]);
+        }
         args
     }
 }
@@ -280,6 +283,21 @@ mod tests {
         assert!(
             qp.contains("-pix_fmt:v p010le -tag:v hvc1 -profile:v main10"),
             "{qp}"
+        );
+    }
+
+    #[test]
+    fn svt_av1_gets_no_peak_rate() {
+        let svt = find(VideoCodec::Av1, EncoderBackend::Software)
+            .bitrate_args(1e6, 60, Depth::Sdr8)
+            .join(" ");
+        assert!(svt.ends_with("-b:v 1000000"), "{svt}");
+        let x265 = find(VideoCodec::H265, EncoderBackend::Software)
+            .bitrate_args(1e6, 60, Depth::Sdr8)
+            .join(" ");
+        assert!(
+            x265.ends_with("-maxrate:v 2000000 -bufsize:v 4000000"),
+            "{x265}"
         );
     }
 }
