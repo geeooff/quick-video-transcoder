@@ -14,7 +14,12 @@ FFmpeg on the `PATH` for the end-to-end test. Before committing, run the same ch
 .\scripts\build.ps1 release    # from a clean tree: the same, then the zip in dist\
 ```
 
-Warnings are errors, in clippy and in rustdoc.
+Warnings are errors, in clippy and in rustdoc. The release zip's third-party notices need
+[cargo-about](https://github.com/EmbarkStudios/cargo-about) (`cargo install cargo-about --locked --features cli`);
+`about.toml` lists the licences accepted. The icon and the version block are compiled in by `build.rs`
+with `rc.exe` from the Windows SDK (installed with the MSVC build tools); without it the build still works,
+without an icon. After editing `assets/icon/quick-video-transcoder.svg`, run `.\scripts\render-icon.ps1`
+(needs Microsoft Edge) and commit the three files.
 
 Measuring the size fitting on a real video, without the window (the video is only read; the output folder
 must exist and differ from the video's):

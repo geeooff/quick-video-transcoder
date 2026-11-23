@@ -9,6 +9,7 @@
 //! - a setting edited with several videos selected changes that setting on every selected video, and only
 //!   that one.
 
+mod help;
 mod preview;
 mod queue_panel;
 mod settings;
@@ -24,9 +25,11 @@ use crossbeam_channel::{Receiver, Sender, unbounded};
 use eframe::egui;
 use serde::{Deserialize, Serialize};
 
+use crate::ffmpeg::Install;
 use crate::ffmpeg::decoder::DecodeConfig;
 use crate::ffmpeg::encoders::EncoderBackend;
 use crate::ffmpeg::hardware::{self, Capabilities};
+use crate::instance::Incoming;
 use crate::plan;
 use crate::player::{AudioSource, Player};
 use crate::profile::{self, ProfileSet};
@@ -126,7 +129,14 @@ pub struct TranscoderApp {
     thumbnail_sender: Sender<Thumbnail>,
     thumbnail_receiver: Receiver<Thumbnail>,
 
-    detection: Option<Receiver<Capabilities>>,
+    detection: Option<Receiver<(Install, Capabilities)>>,
+    /// FFmpeg is missing or too old: the help window shows this until closed.
+    ffmpeg_problem: Option<Install>,
+    /// Files from later launches ([`crate::instance`]).
+    incoming: Option<Incoming>,
+    /// The *Send to* shortcut exists (checked at start and after each change).
+    sendto_installed: bool,
+    show_about: bool,
     /// The GPU drawing the window and its driver: with the encoder, the key of a parallelism measurement.
     gpu: String,
     /// A running measurement of encodes at once, and its key.
@@ -145,7 +155,11 @@ pub struct TranscoderApp {
 
 impl TranscoderApp {
     /// Creates the application and queues `files`.
-    pub fn new(cc: &eframe::CreationContext<'_>, files: Vec<PathBuf>) -> Self {
+    pub fn new(
+        cc: &eframe::CreationContext<'_>,
+        files: Vec<PathBuf>,
+        incoming: Option<Incoming>,
+    ) -> Self {
         let prefs: Preferences = cc
             .storage
             .and_then(|s| eframe::get_value(s, PREFERENCES_KEY))
@@ -157,12 +171,7 @@ impl TranscoderApp {
         let ctx = cc.egui_ctx.clone();
         let notify: Arc<dyn Fn() + Send + Sync> = Arc::new(move || ctx.request_repaint());
         let capabilities = prefs.capabilities.clone().unwrap_or_default();
-        let (sender, detection) = crossbeam_channel::bounded(1);
-        let repaint = Arc::clone(&notify);
-        std::thread::spawn(move || {
-            let _ = sender.send(Capabilities::detect());
-            repaint();
-        });
+        let detection = spawn_detection(Arc::clone(&notify));
         let profiles_path = profile::data_dir().map(|dir| dir.join(ProfileSet::FILE_NAME));
         let mut log = VecDeque::new();
         let profiles = match profiles_path.as_deref().map(ProfileSet::load) {
@@ -177,6 +186,10 @@ impl TranscoderApp {
             None => ProfileSet::default(),
         };
         let (thumbnail_sender, thumbnail_receiver) = unbounded();
+        if let Some(incoming) = &incoming {
+            let wake = Arc::clone(&notify);
+            incoming.set_waker(move || wake());
+        }
         let mut app = Self {
             queue: Queue::new(capabilities, prefs.queue_settings(), Arc::clone(&notify)),
             profiles,
@@ -193,6 +206,10 @@ impl TranscoderApp {
             thumbnail_sender,
             thumbnail_receiver,
             detection: Some(detection),
+            ffmpeg_problem: None,
+            incoming,
+            sendto_installed: crate::sendto::is_installed(),
+            show_about: false,
             gpu: cc
                 .wgpu_render_state
                 .as_ref()
@@ -356,13 +373,26 @@ impl TranscoderApp {
     }
 
     fn poll_detection(&mut self) {
-        let Some(capabilities) = self.detection.as_ref().and_then(|r| r.try_recv().ok()) else {
+        let Some((install, capabilities)) = self.detection.as_ref().and_then(|r| r.try_recv().ok())
+        else {
             return;
         };
         self.detection = None;
+        match &install {
+            Install::Ready(version) => self.info(version.clone()),
+            Install::Missing(program) => self.error(format!("{program} is not on the PATH")),
+            Install::TooOld(version) => self.error(format!(
+                "{version}: FFmpeg {} or later is needed",
+                crate::ffmpeg::MIN_MAJOR_VERSION
+            )),
+        }
+        if !matches!(install, Install::Ready(_)) {
+            self.ffmpeg_problem = Some(install);
+            return;
+        }
         self.info(format!("hardware: {}", capabilities.summary()));
         if capabilities.encoders.is_empty() {
-            self.error("no working video encoder: is FFmpeg on the PATH?");
+            self.error("FFmpeg runs, but none of its video encoders works on this computer");
         }
         self.prefs.capabilities = Some(capabilities.clone());
         if capabilities != self.queue.capabilities {
@@ -378,6 +408,15 @@ impl TranscoderApp {
         let Some(spec) = self.queue.capabilities.choose(&codecs, self.prefs.backend) else {
             return;
         };
+        if spec.backend == EncoderBackend::Software {
+            // A CPU encoder already uses every core: two at once only share them. Not measured, since
+            // a CPU encode of the synthetic picture can take minutes.
+            if !self.prefs.parallel_manual && self.prefs.parallel_encodes != 1 {
+                self.prefs.parallel_encodes = 1;
+                self.queue.set_settings(self.prefs.queue_settings());
+            }
+            return;
+        }
         let key = format!("{} / {}", self.gpu, spec.name);
         let known = self
             .prefs
@@ -732,6 +771,8 @@ impl TranscoderApp {
                     self.remove_selected();
                 }
                 ui.separator();
+                self.sendto_menu(ui);
+                ui.separator();
                 if ui.button("Quit").clicked() {
                     ui.ctx().send_viewport_cmd(egui::ViewportCommand::Close);
                 }
@@ -758,6 +799,16 @@ impl TranscoderApp {
                 if ui.button("Keyboard shortcuts").clicked() {
                     ui.close();
                     self.show_shortcuts = true;
+                }
+                if ui.button("Documentation").clicked() {
+                    ui.close();
+                    ui.ctx()
+                        .open_url(egui::OpenUrl::new_tab(crate::build_info::documentation()));
+                }
+                ui.separator();
+                if ui.button("About Quick Video Transcoder").clicked() {
+                    ui.close();
+                    self.show_about = true;
                 }
             });
         });
@@ -951,6 +1002,25 @@ impl TranscoderApp {
     }
 }
 
+/// Checks FFmpeg and tries its encoders on a background thread (about a second).
+fn spawn_detection(notify: Arc<dyn Fn() + Send + Sync>) -> Receiver<(Install, Capabilities)> {
+    let (sender, detection) = crossbeam_channel::bounded(1);
+    std::thread::spawn(move || {
+        let install = Install::check();
+        let capabilities = match install {
+            Install::Ready(_) => Capabilities::detect(),
+            _ => Capabilities {
+                encoders: Vec::new(),
+                placebo: false,
+                detected: true,
+            },
+        };
+        let _ = sender.send((install, capabilities));
+        notify();
+    });
+    detection
+}
+
 /// A path written with Windows' own separators: Windows accepts `/`, but a path given with them (from a
 /// shell) would reach the clipboard and the output names mixed with `\`.
 fn native_separators(path: PathBuf) -> PathBuf {
@@ -1008,6 +1078,7 @@ impl eframe::App for TranscoderApp {
         self.poll_parallel_measurement();
         self.handle_dropped_files(&ctx);
         self.handle_shortcuts(&ctx);
+        self.poll_incoming(&ctx);
         self.poll_queue();
         self.poll_thumbnails(&ctx);
         self.update_player(&ctx);
@@ -1039,6 +1110,8 @@ impl eframe::App for TranscoderApp {
 
         self.shortcuts_window(&ctx);
         self.profiles_window(&ctx);
+        self.about_window(&ctx);
+        self.ffmpeg_window(&ctx);
         self.take_screenshot(&ctx);
     }
 

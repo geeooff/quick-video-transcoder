@@ -43,6 +43,9 @@ src/plan.rs     frame rates, sizes, ladder, budget            src/estimate.rs si
 src/encode.rs   encode, size check, retry                     src/naming.rs   output and partial names
 src/ffmpeg/     probe, encoders, filters, hardware, decoder (preview), audio
 src/player.rs   preview playback      src/audio.rs  cpal output and clock      src/thumbnails.rs  strip
+src/main.rs     arguments, log file, crash box, window     src/instance.rs one window, later launches' files
+src/sendto.rs   the Send to shortcut                       src/build_info.rs + build.rs  version, commit, icon
+assets/icon/    the icon: SVG source, .ico and .png from scripts/render-icon.ps1
 tests/pipeline.rs   end to end on synthetic clips          examples/transcode.rs  measurement on a video
 ```
 
@@ -65,8 +68,13 @@ tests/pipeline.rs   end to end on synthetic clips          examples/transcode.rs
 ```powershell
 .\scripts\build.ps1            # fmt, clippy -D warnings, rustdoc -D warnings, tests, doc links, no video / personal path
 .\scripts\build.ps1 build      # + release build
-.\scripts\build.ps1 release    # + clean tree, zip in dist\
+.\scripts\build.ps1 release    # + clean tree, zip, SHA256SUMS.txt and notes.md in dist\ (needs cargo-about)
 ```
+
+- **Documentation ships at its commit.** `build.rs` stamps the commit into the executable; *About*,
+  `--version` and the release readme link the documentation *of that commit*. A change updates the README,
+  `docs/` and module doc comments in the same commit, or the build that carries it links stale pages
+  forever.
 
 - Run `test` before every commit and read its whole output; never pipe it into `Select-Object -First`.
 - Commit only when asked. Messages say what and why, ending with the `Co-Authored-By` line.
@@ -81,7 +89,11 @@ tests/pipeline.rs   end to end on synthetic clips          examples/transcode.rs
 ## Pitfalls that have already cost time
 
 - Shell heredocs and inline strings eat backslashes: any script with a backslash goes through a file
-  written by an editing tool, never a heredoc.
+  written by an editing tool, never a heredoc. A Python heredoc editing a workflow turned `\b` into a
+  backspace and `\n` into a line break in `release.yml` (2026-11-23).
+- A PowerShell regex built in a double-quoted string runs `$(...)` as a subexpression: the release notes
+  pattern did, and would have failed the first tag. Build patterns from single-quoted pieces; `build.ps1`
+  tests the extraction on a sample changelog every run.
 - A shell started by the Claude desktop app may read `%APPDATA%` through the package's private copy: the
   profiles file seen from such a shell may not be the one the application reads.
 - `-hwaccel vulkan` silently falls back to software decoding for a codec Vulkan cannot decode, and

@@ -36,9 +36,24 @@ refuses a tag without one.
   is read as 59.94 fps and encoded at 29.97 fps, not 28.
 - *Copy* puts encoded files on the clipboard, ready to paste into a conversation; *Show* opens their
   folder.
-- `install-sendto.ps1` adds the application to Explorer's *Send to* menu.
+- *File → Add to Explorer's Send to menu* adds the application to *Send to*, no script needed; *Remove*
+  takes it away.
+- One window at a time: videos sent while the window is open join its queue.
+- An icon, for the program, its window, the taskbar and *Send to*, and a version in the file's
+  properties.
+- *Help → About* shows the version and the commit it was built from, and *Help → Documentation* opens the
+  documentation as it was for that build. The readme in the release zip links the same pages.
+- If FFmpeg is missing or too old, a window says how to install it and checks again; FFmpeg installed
+  while Windows was running is found without signing out.
+- A log of the last two runs in the data folder, and a message naming it if the window cannot open or
+  the application stops.
+- The release zip lists the libraries built in, with their licences, in `THIRD-PARTY-NOTICES.html`.
 
 ### Fixed
 
 - The buttons' symbols are monochrome again, drawn with the window's own fonts instead of the
   system's colour emoji.
+- A GPU encoder is only used if it accepts the options the encode needs (B-frames, lookahead,
+  multipass), so an older GPU no longer fails every estimate.
+- With only CPU encoders, the queue no longer pauses for minutes to measure parallel encodes: one encode
+  at a time, which already uses every core.

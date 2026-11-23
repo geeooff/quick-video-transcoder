@@ -8,14 +8,17 @@
 
 pub mod app;
 pub mod audio;
+pub mod build_info;
 pub mod clipboard;
 pub mod encode;
 pub mod estimate;
 pub mod ffmpeg;
+pub mod instance;
 pub mod naming;
 pub mod plan;
 pub mod player;
 pub mod profile;
 pub mod queue;
+pub mod sendto;
 pub mod thumbnails;
 pub mod timecode;

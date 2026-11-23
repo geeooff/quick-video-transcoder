@@ -55,7 +55,7 @@ impl Capabilities {
         std::thread::scope(|scope| {
             let tests: Vec<_> = candidates
                 .iter()
-                .map(|spec| scope.spawn(move || (spec, test_encoder(spec.name))))
+                .map(|spec| scope.spawn(move || (spec, test_encoder(spec))))
                 .collect();
             let placebo = scope.spawn(test_placebo);
             Self {
@@ -208,21 +208,21 @@ pub fn run_test(args: &[&str], timeout: Duration) -> bool {
     }
 }
 
-fn test_encoder(name: &str) -> bool {
-    run_test(
-        &[
-            "-f",
-            "lavfi",
-            "-i",
-            "color=c=gray:s=256x256:r=30:d=0.1",
-            "-c:v",
-            name,
-            "-f",
-            "null",
-            "-",
-        ],
-        Duration::from_secs(10),
-    )
+/// Tries an encoder with the options the estimate and the encode really use (constant QP, then the
+/// bitrate rate control with its lookahead, B-frames and multipass), on a tiny picture. A bare `-c:v`
+/// test passes on GPUs that then refuse those options (older NVENC generations have no B-frames for
+/// H.265), and every estimate would fail.
+fn test_encoder(spec: &EncoderSpec) -> bool {
+    use super::encoders::Depth;
+    let mut args: Vec<String> = ["-f", "lavfi", "-i", "testsrc2=s=320x240:r=30:d=0.5"]
+        .map(String::from)
+        .to_vec();
+    args.extend(spec.constant_qp_args(26.0, 30, Depth::Sdr8));
+    args.extend(["-f", "null", "-"].map(String::from));
+    args.extend(spec.bitrate_args(1_000_000.0, 30, Depth::Sdr8));
+    args.extend(["-f", "null", "-"].map(String::from));
+    let args: Vec<&str> = args.iter().map(String::as_str).collect();
+    run_test(&args, Duration::from_secs(15))
 }
 
 /// Most encodes the measurement tries at once.

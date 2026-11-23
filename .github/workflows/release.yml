@@ -8,13 +8,11 @@ on:
   push:
     tags: ['v*']
 
-# Publishing, and the attestation: the OIDC token signs it, the others store it with the files it vouches
-# for.
+# Publishing, and the attestation: the OIDC token signs it, `attestations` stores it.
 permissions:
   contents: write
   id-token: write
   attestations: write
-  artifact-metadata: write
 
 concurrency:
   group: release-${{ github.ref }}
@@ -48,22 +46,21 @@ jobs:
           }
           "QVT_VERSION=$version" | Add-Content $env:GITHUB_ENV
 
-      - name: Test, build and zip
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-about@0.9
+          fallback: none
+
+      # The zip, SHA256SUMS.txt and notes.md (the changelog section of this version), all in dist\.
+      - name: Test, build and package
         shell: pwsh
         run: .\scripts\build.ps1 release
 
-      # The section of the changelog for this version is the release's notes; no section, no release.
-      - name: Checksum and notes
+      # No dated changelog section, no release: the tag stays without one until it is fixed.
+      - name: The changelog has this version's notes
         shell: pwsh
         run: |
-          $zip = "dist\quick-video-transcoder-$env:QVT_VERSION-windows-x64.zip"
-          $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()
-          "$hash  $(Split-Path -Leaf $zip)" | Set-Content -NoNewline -Encoding ascii dist\SHA256SUMS.txt
-          $changelog = Get-Content CHANGELOG.md -Raw
-          $pattern = "(?ms)^## \[$([regex]::Escape($env:QVT_VERSION))\] - \d{4}-\d{2}-\d{2}\s*$(.*?)(?=^## \[|\z)"
-          $match = [regex]::Match($changelog, $pattern)
-          if (-not $match.Success) { throw "CHANGELOG.md has no dated section for $env:QVT_VERSION" }
-          $match.Groups[1].Value.Trim() | Set-Content -Encoding utf8 dist\notes.md
+          if (-not (Test-Path dist\notes.md)) { throw "CHANGELOG.md has no dated section for $env:QVT_VERSION" }
 
       - name: Attest the release files
         uses: actions/attest@v4
