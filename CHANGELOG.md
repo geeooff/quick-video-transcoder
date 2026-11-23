@@ -37,3 +37,8 @@ refuses a tag without one.
 - *Copy* puts encoded files on the clipboard, ready to paste into a conversation; *Show* opens their
   folder.
 - `install-sendto.ps1` adds the application to Explorer's *Send to* menu.
+
+### Fixed
+
+- The buttons' symbols are monochrome again, drawn with the window's own fonts instead of the
+  system's colour emoji.

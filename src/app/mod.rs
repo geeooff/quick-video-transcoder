@@ -1046,3 +1046,29 @@ impl eframe::App for TranscoderApp {
         eframe::set_value(storage, PREFERENCES_KEY, &self.prefs);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use eframe::egui::epaint::text::{FontDefinitions, FontId, Fonts, TextOptions};
+
+    /// Every symbol the window draws outside plain ASCII. Add one here when a label gains one.
+    const SYMBOLS: &str = "➕✔✖▶⏹⏶⏮◀⏸⏭🔇🔊➡≈·—…";
+
+    /// The symbols come from egui's own fonts (the `monochrome_emoji_fonts` feature), not from the
+    /// system's colour emoji: without a font provider, `has_glyphs` only sees the embedded fonts.
+    #[test]
+    fn symbols_are_in_the_embedded_fonts() {
+        let mut fonts = Fonts::new(TextOptions::default(), FontDefinitions::default());
+        let mut fonts = fonts.with_pixels_per_point(1.0);
+        let missing: Vec<String> = SYMBOLS
+            .chars()
+            .filter(|symbol| !fonts.has_glyphs(&FontId::proportional(14.0), &symbol.to_string()))
+            .map(|symbol| format!("{symbol} (U+{:04X})", symbol as u32))
+            .collect();
+        assert!(
+            missing.is_empty(),
+            "missing from egui's fonts: {}",
+            missing.join(", ")
+        );
+    }
+}

@@ -250,14 +250,14 @@ impl TranscoderApp {
                 ui.label("Codec");
                 egui::ComboBox::from_id_salt("codec")
                     .selected_text(format!(
-                        "{} → {}",
+                        "{} ➡ {}",
                         list_label(&after.codecs),
                         resolved(&after.codecs)
                     ))
                     .width(220.0)
                     .show_ui(ui, |ui| {
                         for list in &lists {
-                            let text = format!("{}  → {}", list_label(list), resolved(list));
+                            let text = format!("{}  ➡ {}", list_label(list), resolved(list));
                             ui.selectable_value(&mut after.codecs, list.clone(), text);
                         }
                     })
@@ -735,7 +735,7 @@ impl TranscoderApp {
                             ))
                             .weak(),
                         );
-                        if ui.add_enabled(index > 0, egui::Button::new("▲")).on_hover_text("Move up").clicked() {
+                        if ui.add_enabled(index > 0, egui::Button::new("⏶")).on_hover_text("Move up").clicked() {
                             raise = Some(index);
                         }
                         if ui.add_enabled(count > 1, egui::Button::new("✖")).on_hover_text("Delete").clicked() {
