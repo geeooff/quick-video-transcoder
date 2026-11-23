@@ -60,13 +60,13 @@ impl ToneMapping {
     }
 
     /// Name shown in the UI.
-    pub fn label(self) -> &'static str {
+    pub fn label(self) -> String {
         match self {
-            Self::Auto => "Automatic (libplacebo)",
-            Self::Bt2390 => "BT.2390",
-            Self::Spline => "Spline",
-            Self::Hable => "Hable (filmic)",
-            Self::Mobius => "Möbius",
+            Self::Auto => crate::tr!("profile-tone-auto"),
+            Self::Bt2390 => crate::tr!("profile-tone-bt2390"),
+            Self::Spline => crate::tr!("profile-tone-spline"),
+            Self::Hable => crate::tr!("profile-tone-hable"),
+            Self::Mobius => crate::tr!("profile-tone-mobius"),
         }
     }
 }
@@ -298,13 +298,19 @@ impl Default for ProfileSet {
     }
 }
 
+/// The user-facing "cannot read" text for a profiles file.
+fn cannot_read(path: &Path) -> String {
+    crate::tr!("profile-cannot-read", path = path.display().to_string())
+}
+
 impl ProfileSet {
     /// Name of the file in the data folder.
     pub const FILE_NAME: &'static str = "profiles.toml";
 
     /// Parses the TOML text of a profiles file. Missing fields take the built-in profile's values.
     pub fn parse(text: &str) -> Result<Self> {
-        let mut set: Self = toml::from_str(text).context("invalid profiles file")?;
+        let mut set: Self =
+            toml::from_str(text).with_context(|| crate::tr!("profile-invalid-file"))?;
         if set.profiles.is_empty() {
             set = Self::default();
         }
@@ -326,25 +332,29 @@ impl ProfileSet {
     /// Reads `path`, or the built-in set when the file does not exist yet.
     pub fn load(path: &Path) -> Result<Self> {
         match std::fs::read_to_string(path) {
-            Ok(text) => {
-                Self::parse(&text).with_context(|| format!("cannot read {}", path.display()))
-            }
+            Ok(text) => Self::parse(&text).with_context(|| cannot_read(path)),
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(Self::default()),
-            Err(error) => Err(error).with_context(|| format!("cannot read {}", path.display())),
+            Err(error) => Err(error).with_context(|| cannot_read(path)),
         }
     }
 
     /// Writes the set to `path` through a temporary file, so a crash never leaves half a file.
     pub fn save(&self, path: &Path) -> Result<()> {
         if let Some(dir) = path.parent() {
-            std::fs::create_dir_all(dir)
-                .with_context(|| format!("cannot create {}", dir.display()))?;
+            std::fs::create_dir_all(dir).with_context(|| {
+                crate::tr!("profile-cannot-create", path = dir.display().to_string())
+            })?;
         }
         let temporary = path.with_extension("toml.tmp");
-        std::fs::write(&temporary, self.to_toml())
-            .with_context(|| format!("cannot write {}", temporary.display()))?;
-        std::fs::rename(&temporary, path)
-            .with_context(|| format!("cannot replace {}", path.display()))
+        std::fs::write(&temporary, self.to_toml()).with_context(|| {
+            crate::tr!(
+                "profile-cannot-write",
+                path = temporary.display().to_string()
+            )
+        })?;
+        std::fs::rename(&temporary, path).with_context(|| {
+            crate::tr!("profile-cannot-replace", path = path.display().to_string())
+        })
     }
 
     /// The profile named `name`, if there is one.

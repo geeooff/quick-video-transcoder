@@ -31,11 +31,11 @@ impl Dynamic {
     }
 
     /// Short label for the queue.
-    pub fn label(self) -> &'static str {
+    pub fn label(self) -> String {
         match self {
-            Self::Sdr => "SDR",
-            Self::Pq => "HDR10",
-            Self::Hlg => "HLG",
+            Self::Sdr => crate::tr!("media-dynamic-sdr"),
+            Self::Pq => crate::tr!("media-dynamic-pq"),
+            Self::Hlg => crate::tr!("media-dynamic-hlg"),
         }
     }
 }
@@ -74,17 +74,23 @@ impl AudioTrack {
 
     /// How the track reads in a menu: `2 · Microphone (AAC, stereo)`.
     pub fn label(&self) -> String {
-        let layout = match self.channels {
-            1 => "mono".to_owned(),
-            2 => "stereo".to_owned(),
-            6 => "5.1".to_owned(),
-            8 => "7.1".to_owned(),
-            n => format!("{n} channels"),
-        };
-        let details = format!("{}, {layout}", codec_label(&self.codec));
+        let layout = crate::tr!("media-audio-layout", channels = self.channels);
+        let codec = codec_label(&self.codec);
+        let number = self.index + 1;
         match &self.title {
-            Some(title) => format!("{} · {title} ({details})", self.index + 1),
-            None => format!("{} · {details}", self.index + 1),
+            Some(title) => crate::tr!(
+                "media-audio-track-titled",
+                number = number,
+                title = title.clone(),
+                codec = codec,
+                layout = layout
+            ),
+            None => crate::tr!(
+                "media-audio-track",
+                number = number,
+                codec = codec,
+                layout = layout
+            ),
         }
     }
 }
@@ -144,13 +150,13 @@ impl MediaInfo {
 
     /// One line describing the source, for the queue (`3840x2160 60 fps AV1 HDR10`).
     pub fn summary(&self) -> String {
-        format!(
-            "{}x{} {} fps {} {}",
-            self.width,
-            self.height,
-            self.frame_rate.label(),
-            codec_label(&self.codec),
-            self.dynamic.label()
+        crate::tr!(
+            "media-summary",
+            width = self.width.to_string(),
+            height = self.height.to_string(),
+            fps = self.frame_rate.label(),
+            codec = codec_label(&self.codec),
+            dynamic = self.dynamic.label()
         )
     }
 }
@@ -304,7 +310,8 @@ fn nominal_rate(guess: Option<FrameRate>, average: Option<FrameRate>) -> FrameRa
 
 /// Parses the JSON printed by `ffprobe -print_format json -show_format -show_streams`.
 pub fn parse_probe_json(json: &str) -> Result<MediaInfo> {
-    let output: ProbeOutput = serde_json::from_str(json).context("invalid ffprobe output")?;
+    let output: ProbeOutput =
+        serde_json::from_str(json).with_context(|| crate::tr!("media-probe-invalid"))?;
     // Cover art is a video stream too (`attached_pic`): skip it.
     let video = output
         .streams
@@ -313,9 +320,9 @@ pub fn parse_probe_json(json: &str) -> Result<MediaInfo> {
             s.codec_type.as_deref() == Some("video")
                 && s.disposition.get("attached_pic").copied().unwrap_or(0) == 0
         })
-        .context("no video stream")?;
+        .with_context(|| crate::tr!("media-no-video"))?;
     let (Some(width), Some(height)) = (video.width, video.height) else {
-        bail!("video stream without dimensions");
+        bail!(crate::tr!("media-no-dimensions"));
     };
     let parse = |rate: &Option<String>| {
         rate.as_deref()
@@ -399,12 +406,12 @@ pub fn probe(path: &Path) -> Result<MediaInfo> {
         .arg(path)
         .stdin(std::process::Stdio::null())
         .output()
-        .context("cannot run ffprobe (is FFmpeg on the PATH?)")?;
+        .with_context(|| crate::tr!("media-ffprobe-start-failed"))?;
     if !output.status.success() {
-        bail!(
-            "ffprobe failed: {}",
-            String::from_utf8_lossy(&output.stderr).trim()
-        );
+        bail!(crate::tr!(
+            "media-ffprobe-failed",
+            detail = String::from_utf8_lossy(&output.stderr).trim().to_owned()
+        ));
     }
     parse_probe_json(&String::from_utf8_lossy(&output.stdout))
 }

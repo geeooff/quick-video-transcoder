@@ -35,11 +35,11 @@ impl Engine {
     };
 
     /// Name for the log and the status line.
-    pub fn label(self) -> &'static str {
+    pub fn label(self) -> String {
         match (self.placebo, self.vulkan_decode) {
-            (true, true) => "Vulkan decode + libplacebo",
-            (true, false) => "libplacebo",
-            (false, _) => "software filters",
+            (true, true) => crate::tr!("media-engine-vulkan"),
+            (true, false) => crate::tr!("media-engine-placebo"),
+            (false, _) => crate::tr!("media-engine-software"),
         }
     }
 }
