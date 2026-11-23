@@ -7,6 +7,14 @@ refuses a tag without one.
 
 ## [Unreleased]
 
+### Added
+
+- The application speaks French: *View → Language* offers Automatic (the system's language), English
+  (United States, United Kingdom) and French (France, Canada, Belgium, Switzerland). It switches at once,
+  without restarting.
+- Numbers follow the chosen language and region: `25,0 Mo` in French, the Canadian and Swiss groupings,
+  `25.0 MB` in English. The size limit box accepts a comma or a point.
+
 ## [1.0.0] - 2026-11-23
 
 The first release.

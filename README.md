@@ -25,6 +25,9 @@ and any video FFmpeg reads.
 - **HDR to SDR done right.** An HDR capture is tone mapped on the GPU by libplacebo, with peak detection
   and gamut mapping, and the preview shows it exactly as it will be encoded.
 - **Ready to paste.** *Copy* puts the encoded file on the clipboard: paste it into the conversation.
+- **English and French.** It follows the system's language, or the one chosen in *View → Language*,
+  regional variants included (French of France, Canada, Belgium, Switzerland; US and UK English), numbers
+  formatted as that region writes them.
 
 Nothing is ever overwritten: an output name that exists gets ` (2)`, and the source is only read.
 

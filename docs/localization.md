@@ -58,6 +58,38 @@ engineers. It should read like a well-made native app of that language, never li
   Only messages that really differ go in `i18n/fr-CA/`.
 - `fr-BE`, `fr-CH`: same texts as `fr` unless a term really differs; their number formats differ anyway (CLDR).
 
+### Regional decisions (2026-11-23)
+
+Each variant was reviewed message by message by a translator briefed as a native professional of that
+region, who kept only real differences:
+
+| Variant | File | What differs from its base |
+| --- | --- | --- |
+| `fr-CA` | `i18n/fr-CA/` | Canadian French keyboard names (`Origine`, `Pg préc` / `Pg suiv`); Québec typography: no space before `; ? !` (still a no-break space before `:` and `%`, inside `« »`). Vocabulary: none — the base already reads naturally in Québec. |
+| `fr-BE` | none | Nothing: Windows and software in Belgium use the same terms and Microsoft's typography. |
+| `fr-CH` | none | Nothing for now: same terms; Swiss usage before `; ! ?` is mixed, so the base is kept until a reliable source says otherwise. |
+| `en-GB` | `i18n/en-GB/` | *colour*, *licence*. |
+
+Numbers differ in every region anyway, from CLDR (`fr-CA` and `fr-CH` group with a no-break space, `fr` with
+a narrow one). A regional file copies whole messages from its base: **when a base message changes, update the
+same message in the regional files** (they hold few).
+
+### Process
+
+Translations are made by subagents with a strong native persona each (a translator writes, another reviews
+cold, a regional localizer per variant), working from this guide, the English comments, the code around each
+message and a screenshot of the window in their language (`shot-lang.ps1`-style: `QVT_LANGUAGE=fr-CA` and
+`QVT_SCREENSHOT`). The orchestrator merges, checks the screenshots and fixes what the translators report
+about the English source or the code.
+
+### Adding a language
+
+1. Add its regional variants to `LANGUAGES` in `src/i18n.rs` (named in that language).
+2. Write `i18n/<language>/quick_video_transcoder.ftl` (complete), then regional files with only what
+   differs. Check the script is covered by egui's fonts (Latin, Greek, Cyrillic are; CJK falls back to the
+   system's fonts; right-to-left scripts are not laid out by egui).
+3. A completeness test like `french_is_complete` for a language the project commits to keep complete.
+
 ### English (`en`, `en-GB`)
 
 - `en` is US English. `en-GB` holds only British spellings and terms that differ (*licence* as a noun,
