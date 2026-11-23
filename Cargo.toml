@@ -54,6 +54,14 @@ codegen-units = 1
 strip = "symbols"
 # Panics keep unwinding: a worker thread that fails must not take the window down.
 
+# For checks, not for users: local builds and pull request CI. Fat LTO runs on one thread (1 min 43 s on
+# a 16-core CPU after each commit); thin LTO spreads over the cores (22 s), for an executable about 12 %
+# larger. Published releases always use `release` (scripts/build.ps1 release without -Fast).
+[profile.release-fast]
+inherits = "release"
+lto = "thin"
+codegen-units = 16
+
 [lints.rust]
 missing_docs = "warn"
 unsafe_code = "forbid"

@@ -10,7 +10,7 @@ FFmpeg on the `PATH` for the end-to-end test. Before committing, run the same ch
 
 ```powershell
 .\scripts\build.ps1            # fmt, clippy, rustdoc, tests, doc links, no video or personal path tracked
-.\scripts\build.ps1 build      # the same, then a release build
+.\scripts\build.ps1 build      # the same, then an optimized build (release-fast profile: thin LTO, about 20 s)
 .\scripts\build.ps1 release    # from a clean tree: the same, then the release .exe and its checksum in dist\
 ```
 
