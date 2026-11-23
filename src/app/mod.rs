@@ -62,6 +62,8 @@ struct Preferences {
     output_dir: Option<PathBuf>,
     volume: f32,
     muted: bool,
+    /// The language chosen in *View → Language* (a tag of `i18n::LANGUAGES`); `None` follows the OS.
+    language: Option<String>,
     /// Last detected hardware, used until this session's detection finishes.
     capabilities: Option<Capabilities>,
 }
@@ -78,6 +80,7 @@ impl Default for Preferences {
             output_dir: None,
             volume: 1.0,
             muted: false,
+            language: None,
             capabilities: None,
         }
     }
@@ -164,6 +167,7 @@ impl TranscoderApp {
             .storage
             .and_then(|s| eframe::get_value(s, PREFERENCES_KEY))
             .unwrap_or_default();
+        crate::i18n::apply(prefs.language.as_deref());
         // Selectable labels sense clicks and drags for text selection, which steals the click from a queue
         // row under its file name: nothing in this window is text to copy.
         cc.egui_ctx
@@ -794,6 +798,7 @@ impl TranscoderApp {
             });
             ui.menu_button("View", |ui| {
                 ui.checkbox(&mut self.show_log, "Log");
+                ui.menu_button(crate::tr!("menu-language"), |ui| self.language_menu(ui));
             });
             ui.menu_button("Help", |ui| {
                 if ui.button("Keyboard shortcuts").clicked() {
@@ -812,6 +817,21 @@ impl TranscoderApp {
                 }
             });
         });
+    }
+
+    /// *View → Language*: automatic, or one regional variant. Applies at once.
+    fn language_menu(&mut self, ui: &mut egui::Ui) {
+        let mut chosen = self.prefs.language.clone();
+        ui.radio_value(&mut chosen, None, crate::tr!("language-automatic"));
+        ui.separator();
+        for (tag, name) in crate::i18n::LANGUAGES {
+            ui.radio_value(&mut chosen, Some(tag.to_owned()), name);
+        }
+        if chosen != self.prefs.language {
+            crate::i18n::apply(chosen.as_deref());
+            self.prefs.language = chosen;
+            ui.ctx().request_repaint();
+        }
     }
 
     fn status_bar(&mut self, ui: &mut egui::Ui) {

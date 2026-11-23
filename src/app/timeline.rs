@@ -34,14 +34,14 @@ impl TranscoderApp {
         ui.horizontal(|ui| {
             if ui
                 .button("⏮")
-                .on_hover_text("Start of the kept part (Home)")
+                .on_hover_text(crate::tr!("timeline-first-tooltip"))
                 .clicked()
             {
                 self.player.seek(trim.start);
             }
             if ui
                 .button("◀|")
-                .on_hover_text("Previous frame (Left)")
+                .on_hover_text(crate::tr!("timeline-previous-tooltip"))
                 .clicked()
             {
                 self.player.step(-1);
@@ -56,21 +56,21 @@ impl TranscoderApp {
                     egui::Button::new(egui::RichText::new(play).size(16.0))
                         .min_size(vec2(36.0, 0.0)),
                 )
-                .on_hover_text("Play / pause the kept part (Space)")
+                .on_hover_text(crate::tr!("timeline-play-tooltip"))
                 .clicked()
             {
                 self.toggle_playback();
             }
             if ui
                 .button("|▶")
-                .on_hover_text("Next frame (Right)")
+                .on_hover_text(crate::tr!("timeline-next-tooltip"))
                 .clicked()
             {
                 self.player.step(1);
             }
             if ui
                 .button("⏭")
-                .on_hover_text("End of the kept part (End)")
+                .on_hover_text(crate::tr!("timeline-last-tooltip"))
                 .clicked()
             {
                 self.player.seek(trim.end);
@@ -83,15 +83,15 @@ impl TranscoderApp {
             ));
             ui.separator();
             if ui
-                .button("[ Start here")
-                .on_hover_text("Start the kept part at the current frame (I)")
+                .button(crate::tr!("timeline-start-here"))
+                .on_hover_text(crate::tr!("timeline-start-here-tooltip"))
                 .clicked()
             {
                 self.set_trim_start(self.player.position());
             }
             if ui
-                .button("End here ]")
-                .on_hover_text("End the kept part after the current frame (O)")
+                .button(crate::tr!("timeline-end-here"))
+                .on_hover_text(crate::tr!("timeline-end-here-tooltip"))
                 .clicked()
             {
                 self.set_trim_end(self.player.position());
@@ -104,7 +104,10 @@ impl TranscoderApp {
                 ui.add_enabled_ui(available, |ui| {
                     let volume = ui
                         .add(egui::Slider::new(&mut self.prefs.volume, 0.0..=1.0).show_value(false))
-                        .on_hover_text(format!("Volume {:.0} %", self.prefs.volume * 100.0));
+                        .on_hover_text(crate::tr!(
+                            "timeline-volume-tooltip",
+                            percent = (self.prefs.volume * 100.0).round()
+                        ));
                     if volume.changed() {
                         self.prefs.muted = false;
                     }
@@ -115,14 +118,14 @@ impl TranscoderApp {
                     };
                     if ui
                         .add(egui::Button::new(icon).selected(self.prefs.muted))
-                        .on_hover_text("Mute / unmute (M)")
+                        .on_hover_text(crate::tr!("timeline-mute-tooltip"))
                         .clicked()
                     {
                         self.prefs.muted = !self.prefs.muted;
                     }
                 })
                 .response
-                .on_disabled_hover_text("No sound");
+                .on_disabled_hover_text(crate::tr!("timeline-no-sound"));
             });
         });
     }

@@ -1,0 +1,5 @@
+# i18n-embed's configuration: English is the reference language, every other falls back to it.
+fallback_language = "en"
+
+[fluent]
+assets_dir = "i18n"

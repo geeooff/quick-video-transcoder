@@ -54,6 +54,8 @@ tests/pipeline.rs   end to end on synthetic clips          examples/transcode.rs
 - Spawn FFmpeg with `ffmpeg::tool()` or `background_tool()` (no console window); collect stderr with
   `StderrTail::finish()` after exit; stop with `kill_tree` (Chocolatey and Scoop shims).
 - Never hard-code an encoder: go through `Capabilities::encoder`. H.265 stays the default codec.
+- Every text a user reads is a Fluent message: `crate::tr!("id")`, numbers through `NUM` in the message
+  (docs/localization.md). Logs and technical details stay in English.
 - Qualities are H.265 QPs everywhere; `EncoderSpec::qp` converts for AV1 scales.
 - Module doc comments carry the rules a module is shaped by: read them first, update them with the rule.
 - The cpal callback is real time: short locks, no I/O, never wait on a decoder.

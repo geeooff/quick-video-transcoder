@@ -13,6 +13,7 @@ pub mod clipboard;
 pub mod encode;
 pub mod estimate;
 pub mod ffmpeg;
+pub mod i18n;
 pub mod instance;
 pub mod naming;
 pub mod plan;

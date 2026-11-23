@@ -121,6 +121,7 @@ for what is documented and how to measure it.
 | --- | --- |
 | [Messenger's limits](docs/messenger.md) | What Meta documents, and how to measure the rest. |
 | [Discord's limits](docs/discord.md) | Upload limits with and without Nitro, formats, the Discord profiles. |
+| [Localization](docs/localization.md) | How texts are translated, the glossary, adding a language. |
 | [Architecture](docs/architecture.md) | How the size fitting, the filters and the preview work, with measurements. |
 | [Changelog](CHANGELOG.md) | What each release changed. |
 | [Contributing](CONTRIBUTING.md) | Building, testing, rules. |
