@@ -228,28 +228,24 @@ fn test_encoder(spec: &EncoderSpec) -> bool {
 /// Most encodes the measurement tries at once.
 pub const MAX_PARALLEL_ENCODES: usize = 4;
 
-/// How many encodes at once still add throughput, from the total frames per second measured with 1, 2,
-/// 3… encodes running together (`totals[n - 1]` for `n` encodes). One more encode counts when it adds at
-/// least half of what one encode does alone: a second hardware engine roughly doubles the total, while
-/// sharing one engine adds a few percent. An RTX 4090 (two NVENC engines) measured 399, 789, 852 and 881
-/// frames per second for 1 to 4 encodes: 2.
+/// How many encodes at once to run, from the total frames per second measured with 1, 2, 3… encodes
+/// running together (`totals[n - 1]` for `n` encodes): the fewest that reach 85 % of the best total. More
+/// encodes than that only share the same engines.
+///
+/// The whole curve is needed, not the first step: the driver decides which engine a session runs on, and
+/// it can put the first two on the same engine. An RTX 4090 (two NVENC engines) measured 399, 789, 852 and
+/// 881 frames per second for 1 to 4 encodes on 2026-11-20 (2), then 147, 205, 295 on 2026-11-23 with the
+/// same driver (3: the second engine only started with the third session).
 pub fn engines_from_throughput(totals: &[f64]) -> usize {
-    let Some(&alone) = totals.first() else {
-        return 1;
-    };
-    let mut engines = 1;
-    for pair in totals.windows(2) {
-        if pair[1] >= pair[0] + 0.5 * alone {
-            engines += 1;
-        } else {
-            break;
-        }
-    }
-    engines
+    let best = totals.iter().copied().fold(0.0, f64::max);
+    totals
+        .iter()
+        .position(|&total| total >= 0.85 * best)
+        .map_or(1, |index| index + 1)
 }
 
-/// Measures how many encodes at once `spec` runs without them slowing each other down: 1, 2, 3…
-/// encodes of a synthetic 1080p60 picture together, timed, until one more adds little (a few seconds in
+/// Measures how many encodes at once `spec` runs best: 1 to [`MAX_PARALLEL_ENCODES`] encodes of a synthetic
+/// 1080p60 picture together, each count timed ([`engines_from_throughput`] reads the curve; about 12 s in
 /// all, measured once per GPU, driver and encoder). `None` when the encoder fails. NVIDIA does not publish the engine count through FFmpeg or its
 /// driver tools, and it varies within a generation (one NVENC on an RTX 3080, two on an RTX 4090), so it is
 /// measured rather than looked up.
@@ -275,13 +271,13 @@ pub fn measure_parallel_encodes(spec: &EncoderSpec) -> Option<usize> {
         });
         if !all_ok {
             // The first run failing means the encoder does not work; a later one, a session limit.
-            return (count > 1).then(|| engines_from_throughput(&totals));
+            if count == 1 {
+                return None;
+            }
+            break;
         }
         let seconds = started.elapsed().as_secs_f64().max(0.001);
         totals.push(f64::from(FRAMES) * count as f64 / seconds);
-        if totals.len() >= 2 && engines_from_throughput(&totals) < totals.len() {
-            break;
-        }
     }
     log::info!(
         "{}: {} frames/s for 1 to {} encodes at once",
@@ -428,10 +424,14 @@ mod tests {
     fn counts_the_encodes_that_still_add_throughput() {
         // Measured on an RTX 4090: two NVENC engines.
         assert_eq!(engines_from_throughput(&[399.0, 789.0, 852.0, 881.0]), 2);
-        // One engine shared: a second encode adds a little.
-        assert_eq!(engines_from_throughput(&[400.0, 450.0]), 1);
+        // The same card later: the driver put the first two sessions on one engine.
+        assert_eq!(engines_from_throughput(&[147.0, 205.0, 295.0, 300.0]), 3);
+        // One engine shared: more encodes add a little.
+        assert_eq!(engines_from_throughput(&[400.0, 450.0, 460.0, 465.0]), 1);
         // Three engines.
         assert_eq!(engines_from_throughput(&[300.0, 590.0, 870.0, 900.0]), 3);
+        // A session limit stopped the measurement after two.
+        assert_eq!(engines_from_throughput(&[300.0, 590.0]), 2);
         assert_eq!(engines_from_throughput(&[]), 1);
     }
 
