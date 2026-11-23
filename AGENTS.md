@@ -62,6 +62,8 @@ tests/pipeline.rs   end to end on synthetic clips          examples/transcode.rs
 - egui: `lost_focus()` lasts two frames, apply a text field only if the user typed in it (`time_edit`);
   sliders use `SliderClamping::Edits`. Some symbols are missing from egui's fonts (arrows, most emoji): check
   a screenshot after adding one.
+- `QVT_PSEUDO=1` and `QVT_LANGUAGE=fr-CA` (debug builds) pseudo-localize or force a language for
+  screenshots (docs/localization.md).
 - `QVT_PRETEND_NO_FFMPEG=1` (debug builds) shows the *FFmpeg is needed* window without uninstalling
   FFmpeg. Never click *Install FFmpeg for me* while testing: it really runs winget.
 - Checking the UI without driving it: `QVT_SCREENSHOT=<file.ppm>` saves the window once the queue is

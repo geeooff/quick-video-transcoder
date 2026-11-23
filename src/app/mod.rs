@@ -167,7 +167,12 @@ impl TranscoderApp {
             .storage
             .and_then(|s| eframe::get_value(s, PREFERENCES_KEY))
             .unwrap_or_default();
-        crate::i18n::apply(prefs.language.as_deref());
+        // Debug builds: `QVT_LANGUAGE=fr-CA` shows a language without changing the saved choice (screenshots).
+        #[cfg(debug_assertions)]
+        let forced = std::env::var("QVT_LANGUAGE").ok();
+        #[cfg(not(debug_assertions))]
+        let forced: Option<String> = None;
+        crate::i18n::apply(forced.as_deref().or(prefs.language.as_deref()));
         // Selectable labels sense clicks and drags for text selection, which steals the click from a queue
         // row under its file name: nothing in this window is text to copy.
         cc.egui_ctx
