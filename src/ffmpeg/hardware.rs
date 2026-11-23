@@ -190,6 +190,77 @@ fn test_encoder(name: &str) -> bool {
     )
 }
 
+/// Most encodes the measurement tries at once.
+pub const MAX_PARALLEL_ENCODES: usize = 4;
+
+/// How many encodes at once still add throughput, from the total frames per second measured with 1, 2,
+/// 3… encodes running together (`totals[n - 1]` for `n` encodes). One more encode counts when it adds at
+/// least half of what one encode does alone: a second hardware engine roughly doubles the total, while
+/// sharing one engine adds a few percent. An RTX 4090 (two NVENC engines) measured 399, 789, 852 and 881
+/// frames per second for 1 to 4 encodes: 2.
+pub fn engines_from_throughput(totals: &[f64]) -> usize {
+    let Some(&alone) = totals.first() else {
+        return 1;
+    };
+    let mut engines = 1;
+    for pair in totals.windows(2) {
+        if pair[1] >= pair[0] + 0.5 * alone {
+            engines += 1;
+        } else {
+            break;
+        }
+    }
+    engines
+}
+
+/// Measures how many encodes at once `spec` runs without them slowing each other down: 1, 2, 3…
+/// encodes of a synthetic 1080p60 picture together, timed, until one more adds little (a few seconds in
+/// all, measured once per GPU, driver and encoder). `None` when the encoder fails. NVIDIA does not publish the engine count through FFmpeg or its
+/// driver tools, and it varies within a generation (one NVENC on an RTX 3080, two on an RTX 4090), so it is
+/// measured rather than looked up.
+pub fn measure_parallel_encodes(spec: &EncoderSpec) -> Option<usize> {
+    const FRAMES: u32 = 300;
+    let mut args: Vec<String> = ["-f", "lavfi", "-i", "testsrc2=s=1920x1080:r=60"]
+        .map(String::from)
+        .to_vec();
+    args.extend(["-frames:v".to_owned(), FRAMES.to_string()]);
+    args.extend(spec.constant_qp_args(26.0, 240, super::encoders::Depth::Sdr8));
+    args.extend(["-f", "null", "-"].map(String::from));
+    let mut totals = Vec::new();
+    for count in 1..=MAX_PARALLEL_ENCODES {
+        let started = Instant::now();
+        let all_ok = std::thread::scope(|scope| {
+            let runs: Vec<_> = (0..count)
+                .map(|_| {
+                    let args: Vec<&str> = args.iter().map(String::as_str).collect();
+                    scope.spawn(move || run_test(&args, Duration::from_secs(60)))
+                })
+                .collect();
+            runs.into_iter().all(|r| r.join().unwrap_or(false))
+        });
+        if !all_ok {
+            // The first run failing means the encoder does not work; a later one, a session limit.
+            return (count > 1).then(|| engines_from_throughput(&totals));
+        }
+        let seconds = started.elapsed().as_secs_f64().max(0.001);
+        totals.push(f64::from(FRAMES) * count as f64 / seconds);
+        if totals.len() >= 2 && engines_from_throughput(&totals) < totals.len() {
+            break;
+        }
+    }
+    log::info!(
+        "{}: {} frames/s for 1 to {} encodes at once",
+        spec.name,
+        totals
+            .iter()
+            .map(|t| format!("{t:.0}"))
+            .collect::<Vec<_>>()
+            .join(", "),
+        totals.len()
+    );
+    Some(engines_from_throughput(&totals))
+}
+
 /// The device options libplacebo needs, before `-i`.
 pub const VULKAN_DEVICE: [&str; 4] = ["-init_hw_device", "vulkan=vk", "-filter_hw_device", "vk"];
 
@@ -274,6 +345,17 @@ mod tests {
             caps.backends(VideoCodec::H265),
             [EncoderBackend::Nvenc, EncoderBackend::Software]
         );
+    }
+
+    #[test]
+    fn counts_the_encodes_that_still_add_throughput() {
+        // Measured on an RTX 4090: two NVENC engines.
+        assert_eq!(engines_from_throughput(&[399.0, 789.0, 852.0, 881.0]), 2);
+        // One engine shared: a second encode adds a little.
+        assert_eq!(engines_from_throughput(&[400.0, 450.0]), 1);
+        // Three engines.
+        assert_eq!(engines_from_throughput(&[300.0, 590.0, 870.0, 900.0]), 3);
+        assert_eq!(engines_from_throughput(&[]), 1);
     }
 
     #[test]

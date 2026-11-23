@@ -99,3 +99,6 @@ tests/pipeline.rs   end to end on synthetic clips          examples/transcode.rs
   the UI, and move the window into the free area. `QVT_DEBUG_HITS=1` (debug builds) draws the widget under the pointer
   and logs each press with the layer it lands on. Drags need a press, several moves and a release, each a
   separate action: one quick drag reads as a click.
+- ffprobe's `r_frame_rate` is a guess and can be far off on variable-rate captures (56 for a 59.94 fps
+  Xbox HDR capture, which made 28 fps outputs): `probe::nominal_rate` trusts it only when it is a standard
+  rate.

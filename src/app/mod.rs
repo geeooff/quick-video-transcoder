@@ -26,7 +26,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::ffmpeg::decoder::DecodeConfig;
 use crate::ffmpeg::encoders::EncoderBackend;
-use crate::ffmpeg::hardware::Capabilities;
+use crate::ffmpeg::hardware::{self, Capabilities};
 use crate::plan;
 use crate::player::{AudioSource, Player};
 use crate::profile::{self, ProfileSet};
@@ -51,6 +51,10 @@ struct Preferences {
     /// Profile given to new videos.
     profile: String,
     parallel_encodes: usize,
+    /// The user set `parallel_encodes` by hand: a measurement no longer changes it.
+    parallel_manual: bool,
+    /// The last measurement of encodes at once, with what it was measured on (GPU, driver, encoder).
+    measured_parallel: Option<(String, usize)>,
     backend: Option<EncoderBackend>,
     output_dir: Option<PathBuf>,
     volume: f32,
@@ -65,6 +69,8 @@ impl Default for Preferences {
             last_dir: None,
             profile: String::new(),
             parallel_encodes: QueueSettings::default().parallel_encodes,
+            parallel_manual: false,
+            measured_parallel: None,
             backend: None,
             output_dir: None,
             volume: 1.0,
@@ -121,6 +127,10 @@ pub struct TranscoderApp {
     thumbnail_receiver: Receiver<Thumbnail>,
 
     detection: Option<Receiver<Capabilities>>,
+    /// The GPU drawing the window and its driver: with the encoder, the key of a parallelism measurement.
+    gpu: String,
+    /// A running measurement of encodes at once, and its key.
+    measuring: Option<(String, Receiver<Option<usize>>)>,
     log: VecDeque<(Level, String)>,
     show_log: bool,
     show_shortcuts: bool,
@@ -183,6 +193,14 @@ impl TranscoderApp {
             thumbnail_sender,
             thumbnail_receiver,
             detection: Some(detection),
+            gpu: cc
+                .wgpu_render_state
+                .as_ref()
+                .map_or_else(String::new, |state| {
+                    let info = state.adapter.get_info();
+                    format!("{} ({})", info.name, info.driver_info)
+                }),
+            measuring: None,
             log,
             show_log: false,
             show_shortcuts: false,
@@ -349,6 +367,56 @@ impl TranscoderApp {
         self.prefs.capabilities = Some(capabilities.clone());
         if capabilities != self.queue.capabilities {
             self.queue.set_capabilities(capabilities);
+        }
+        self.start_parallel_measurement(false);
+    }
+
+    /// Measures how many encodes the default encoder runs at once, unless this GPU, driver and encoder
+    /// were measured before (or `again`). The queue holds new work back meanwhile (a few seconds).
+    fn start_parallel_measurement(&mut self, again: bool) {
+        let codec = self.default_profile().codec;
+        let Some(spec) = self.queue.capabilities.encoder(codec, self.prefs.backend) else {
+            return;
+        };
+        let key = format!("{} / {}", self.gpu, spec.name);
+        let known = self
+            .prefs
+            .measured_parallel
+            .as_ref()
+            .is_some_and(|(measured, _)| *measured == key);
+        if (known && !again) || self.measuring.is_some() {
+            return;
+        }
+        self.info(format!(
+            "measuring how many encodes {} runs at once…",
+            spec.name
+        ));
+        self.queue.set_paused(true);
+        let (sender, receiver) = crossbeam_channel::bounded(1);
+        let notify = Arc::clone(&self.notify);
+        std::thread::spawn(move || {
+            let _ = sender.send(hardware::measure_parallel_encodes(spec));
+            notify();
+        });
+        self.measuring = Some((key, receiver));
+    }
+
+    /// Applies a finished measurement: the parallel encodes follow it unless the user set them by hand.
+    fn poll_parallel_measurement(&mut self) {
+        let Some(result) = self.measuring.as_ref().and_then(|(_, r)| r.try_recv().ok()) else {
+            return;
+        };
+        let (key, _) = self.measuring.take().expect("a measurement was running");
+        self.queue.set_paused(false);
+        let Some(count) = result else {
+            self.error("the encoder failed while measuring its parallel encodes");
+            return;
+        };
+        self.info(format!("{key}: {count} encode(s) at once"));
+        self.prefs.measured_parallel = Some((key, count));
+        if !self.prefs.parallel_manual && self.prefs.parallel_encodes != count {
+            self.prefs.parallel_encodes = count;
+            self.queue.set_settings(self.prefs.queue_settings());
         }
     }
 
@@ -828,6 +896,7 @@ impl TranscoderApp {
             return;
         };
         let busy = self.detection.is_some()
+            || self.measuring.is_some()
             || self.frame_texture.is_none()
             || self.queue.jobs.iter().any(|j| {
                 j.busy()
@@ -936,6 +1005,7 @@ impl eframe::App for TranscoderApp {
         }
         self.confirm_close(&ctx);
         self.poll_detection();
+        self.poll_parallel_measurement();
         self.handle_dropped_files(&ctx);
         self.handle_shortcuts(&ctx);
         self.poll_queue();
