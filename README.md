@@ -76,6 +76,14 @@ window opens: videos sent while it is open join its queue.
 Keyboard shortcuts are under *Help*, with *About* (the version, and this documentation as it was for
 that version).
 
+## Updating
+
+*Help → Check for updates* looks for a newer version on GitHub (the only time the application
+connects), shows what changed, and on request downloads it, checks it against the release's published
+checksums and restarts on it; if the new file cannot be put in place, the previous version comes back.
+The program's folder must be writable (not Program Files): otherwise download the new file from the
+release page and replace it by hand. How it works: [Updating](docs/updating.md).
+
 ## When something goes wrong
 
 The application keeps a log of its last two runs in its data folder (*Profiles → Open profiles.toml
@@ -125,6 +133,7 @@ for what is documented and how to measure it.
 | [Messenger's limits](docs/messenger.md) | What Meta documents, and how to measure the rest. |
 | [Discord's limits](docs/discord.md) | Upload limits with and without Nitro, formats, the Discord profiles. |
 | [Localization](docs/localization.md) | How texts are translated, the glossary, adding a language. |
+| [Updating](docs/updating.md) | How the application updates itself, what it trusts, the measurements. |
 | [Architecture](docs/architecture.md) | How the size fitting, the filters and the preview work, with measurements. |
 | [Changelog](CHANGELOG.md) | What each release changed. |
 | [Contributing](CONTRIBUTING.md) | Building, testing, rules. |
