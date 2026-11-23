@@ -138,9 +138,14 @@ GPU encoders only; with a CPU encoder, one at a time.
 
 ## Releases
 
-`build.rs` stamps the commit into the executable, with the icon and the version block (`rc.exe`).
-`scripts/build.ps1 release` asks the built executable for its commit (`--version`), refuses one that
-differs from the checkout, and packages the executable, the readme with its relative links turned into
-links at that commit, the licence and the third-party notices (`cargo about`). `release.yml` runs it on a
-`v*` tag, requires the changelog section of the version (`notes.md`), attests `SHA256SUMS.txt` and
-publishes.
+A release is one file, `quick-video-transcoder.exe`. `build.rs` stamps the commit into it, embeds the
+third-party notices that `scripts/build.ps1 release` generates with `cargo about` (passed in
+`QVT_NOTICES`), and compiles in the icon and the version block (`rc.exe`); the C runtime is linked
+statically (`.cargo/config.toml`). The script then asks the built executable for its commit
+(`--version`) and notices (`--licenses`), refuses a commit that differs from the checkout or missing
+notices, and writes the executable, `SHA256SUMS.txt` and `notes.md` (the changelog section) to `dist\`.
+`release.yml` runs it on a `v*` tag, requires `notes.md`, attests `SHA256SUMS.txt` and publishes.
+
+When FFmpeg is missing and winget runs, the *FFmpeg is needed* window offers to run
+`winget install --id Gyan.FFmpeg --exact --silent` with the package and source agreements accepted (the
+window says so), then checks again with the `PATH` re-read.

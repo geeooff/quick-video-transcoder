@@ -60,6 +60,8 @@ tests/pipeline.rs   end to end on synthetic clips          examples/transcode.rs
 - egui: `lost_focus()` lasts two frames, apply a text field only if the user typed in it (`time_edit`);
   sliders use `SliderClamping::Edits`. Some symbols are missing from egui's fonts (arrows, most emoji): check
   a screenshot after adding one.
+- `QVT_PRETEND_NO_FFMPEG=1` (debug builds) shows the *FFmpeg is needed* window without uninstalling
+  FFmpeg. Never click *Install FFmpeg for me* while testing: it really runs winget.
 - Checking the UI without driving it: `QVT_SCREENSHOT=<file.ppm>` saves the window once the queue is
   estimated and the preview shows a frame, then quits. Run it on synthetic clips in a scratch folder.
 
@@ -68,13 +70,15 @@ tests/pipeline.rs   end to end on synthetic clips          examples/transcode.rs
 ```powershell
 .\scripts\build.ps1            # fmt, clippy -D warnings, rustdoc -D warnings, tests, doc links, no video / personal path
 .\scripts\build.ps1 build      # + release build
-.\scripts\build.ps1 release    # + clean tree, zip, SHA256SUMS.txt and notes.md in dist\ (needs cargo-about)
+.\scripts\build.ps1 release    # + clean tree, notices, the .exe, SHA256SUMS.txt and notes.md in dist\ (needs cargo-about)
 ```
 
-- **Documentation ships at its commit.** `build.rs` stamps the commit into the executable; *About*,
-  `--version` and the release readme link the documentation *of that commit*. A change updates the README,
-  `docs/` and module doc comments in the same commit, or the build that carries it links stale pages
-  forever.
+- **One file.** A release is `quick-video-transcoder.exe` alone: static C runtime, icon, third-party
+  notices (`--licenses`, *About*) inside. FFmpeg stays outside, found on the `PATH` or installed with
+  winget on the user's request. Keep it that way: nothing a user must unpack or install beside it.
+- **Documentation ships at its commit.** `build.rs` stamps the commit into the executable; *About* and
+  `--version` link the documentation *of that commit*. A change updates the README, `docs/` and module doc
+  comments in the same commit, or the build that carries it links stale pages forever.
 
 - Run `test` before every commit and read its whole output; never pipe it into `Select-Object -First`.
 - Commit only when asked. Messages say what and why, ending with the `Co-Authored-By` line.

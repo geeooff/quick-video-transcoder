@@ -32,29 +32,33 @@ Nothing is ever overwritten: an output name that exists gets ` (2)`, and the sou
 
 - Windows 10 or 11 (64-bit), with a graphics driver supporting DirectX 12 or Vulkan. Linux and macOS
   build, but are not tested.
-- [FFmpeg](https://ffmpeg.org/download.html) 7 or later. The simplest way is one command in Terminal:
-  `winget install --id Gyan.FFmpeg -e`; or the *release full* build from
-  [gyan.dev](https://www.gyan.dev/ffmpeg/builds/), with its `bin` folder added to the `Path`. GPU tone
+- [FFmpeg](https://ffmpeg.org/download.html) 7 or later, a separate free program. If it is missing, the
+  application says so and, when Windows' package manager winget is there, offers to install it for you
+  (the `Gyan.FFmpeg` package, for your account only); it is then found without signing out. To install it
+  yourself: `winget install --id Gyan.FFmpeg -e` in Terminal, or the *release full* build from
+  [gyan.dev](https://www.gyan.dev/ffmpeg/builds/) with its `bin` folder added to the `Path`. GPU tone
   mapping needs an FFmpeg built with libplacebo and Vulkan (the gyan.dev full build is); without it the
-  CPU filters are used. If FFmpeg is missing, the application says so and how to install it, and finds it
-  once installed without signing out.
+  CPU filters are used.
 - A GPU encoder makes it fast: NVIDIA NVENC, Intel Quick Sync or AMD AMF. The CPU encoders work too,
   slowly. **Tested on NVIDIA GPUs only**: Quick Sync and AMF are detected and used, but have not been
   tried on real hardware yet.
 
 ## Install
 
-1. Download the zip from the [latest release](https://github.com/Geeooff/quick-video-transcoder/releases/latest)
-   and extract it where you keep your tools. It holds the program, this readme, its licence and the
-   third-party notices.
-2. Start `quick-video-transcoder.exe`. The program is not signed, so the first time Windows may show
-   *Windows protected your PC*: click *More info*, then *Run anyway*. To check the download first, compare
-   it with `SHA256SUMS.txt` on the release page, or verify where it was built with
-   `gh attestation verify <zip> --repo Geeooff/quick-video-transcoder`.
-3. *File → Add to Explorer's Send to menu*. Move the folder later? Do it again: the shortcut follows.
+Nothing to install: the program is one file.
+
+1. Download `quick-video-transcoder.exe` from the
+   [latest release](https://github.com/Geeooff/quick-video-transcoder/releases/latest) and put it where
+   you keep your tools.
+2. Start it. The program is not signed, so the first time Windows may show *Windows protected your PC*:
+   click *More info*, then *Run anyway*. To check the download first, compare it with `SHA256SUMS.txt` on
+   the release page, or verify where it was built with
+   `gh attestation verify quick-video-transcoder.exe --repo Geeooff/quick-video-transcoder`.
+3. *File → Add to Explorer's Send to menu*. Moved the file? Do it again: the shortcut follows.
    *File → Remove from Explorer's Send to menu* takes it away.
 
-Only one window opens: videos sent while it is open join its queue.
+To update, replace the file with the new one (same name: the *Send to* shortcut keeps working). Only one
+window opens: videos sent while it is open join its queue.
 
 ## Use
 
@@ -124,5 +128,6 @@ for what is documented and how to measure it.
 
 ## License
 
-MIT. See [LICENSE](LICENSE). The libraries built in are listed with their licences in
-`THIRD-PARTY-NOTICES.html`, in the zip. FFmpeg is not included; it has its own licenses.
+MIT. See [LICENSE](LICENSE). The libraries built in are listed with their licences in the program
+(*Help → About*, *third-party libraries and their licences*). FFmpeg is not included; it has its own
+licenses.

@@ -42,12 +42,13 @@ refuses a tag without one.
 - An icon, for the program, its window, the taskbar and *Send to*, and a version in the file's
   properties.
 - *Help → About* shows the version and the commit it was built from, and *Help → Documentation* opens the
-  documentation as it was for that build. The readme in the release zip links the same pages.
-- If FFmpeg is missing or too old, a window says how to install it and checks again; FFmpeg installed
-  while Windows was running is found without signing out.
+  documentation as it was for that build.
+- If FFmpeg is missing or too old, a window says how to install it, offers to do it with winget, and
+  checks again; FFmpeg installed while Windows was running is found without signing out.
 - A log of the last two runs in the data folder, and a message naming it if the window cannot open or
   the application stops.
-- The release zip lists the libraries built in, with their licences, in `THIRD-PARTY-NOTICES.html`.
+- One file, nothing to install: the release is `quick-video-transcoder.exe` alone, the C runtime and the
+  third-party licences inside (*Help → About*). Replacing the file updates it.
 
 ### Fixed
 

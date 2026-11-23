@@ -1,8 +1,8 @@
 name: Release
 
 # A tag alone produces the release: push vX.Y.Z and this runs the same checklist a developer runs, builds
-# the zip from that exact commit, attests it, and publishes it with its checksum. Nothing is built or
-# uploaded by hand.
+# the executable from that exact commit, attests it, and publishes it with its checksum. Nothing is built
+# or uploaded by hand.
 
 on:
   push:
@@ -51,7 +51,8 @@ jobs:
           tool: cargo-about@0.9
           fallback: none
 
-      # The zip, SHA256SUMS.txt and notes.md (the changelog section of this version), all in dist\.
+      # quick-video-transcoder.exe, SHA256SUMS.txt and notes.md (the changelog section of this version),
+      # all in dist\.
       - name: Test, build and package
         shell: pwsh
         run: .\scripts\build.ps1 release
@@ -73,7 +74,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create $env:GITHUB_REF_NAME `
-            "dist\quick-video-transcoder-$env:QVT_VERSION-windows-x64.zip" `
+            dist\quick-video-transcoder.exe `
             dist\SHA256SUMS.txt `
             --title "Quick Video Transcoder $env:QVT_VERSION" `
             --notes-file dist\notes.md `

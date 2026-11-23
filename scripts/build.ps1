@@ -5,7 +5,7 @@
 #
 #   .\scripts\build.ps1            # test (the default)
 #   .\scripts\build.ps1 build      # test, then the release build
-#   .\scripts\build.ps1 release    # test, release build, zip into dist\ (from a clean tree outside CI)
+#   .\scripts\build.ps1 release    # test, notices, release build, the .exe and its checksum in dist\ (from a clean tree outside CI)
 #
 # Never pipe it into Select-Object -First: that stops the pipeline mid-run, and a truncated run can look
 # like a success. Read the whole output, or the last line.
@@ -155,9 +155,34 @@ function Invoke-Tests {
     Write-Host "    $(@($tracked).Count) tracked files, no video, no personal path"
 }
 
-function Invoke-Build {
+# A release build embeds the third-party notices: generated here by cargo-about into target\, handed to
+# build.rs through QVT_NOTICES. A plain build embeds a placeholder.
+function Invoke-Build([switch] $WithNotices) {
+    if ($WithNotices) {
+        Step "Third-party notices"
+        if (-not (Get-Command cargo-about -ErrorAction SilentlyContinue)) {
+            Fail "cargo-about is needed: cargo install cargo-about --locked --features cli"
+        }
+        $notices = Join-Path $root 'target\THIRD-PARTY-NOTICES.html'
+        New-Item -ItemType Directory -Force (Split-Path -Parent $notices) | Out-Null
+        Run 'cargo' @('about', 'generate', '--locked', '--fail', '--output-file', $notices, (Join-Path $root 'about.hbs'))
+        Write-Host "    $([math]::Round((Get-Item $notices).Length / 1KB)) KB"
+        $env:QVT_NOTICES = $notices
+    }
     Step "Release build"
-    Run 'cargo' @('build', '--release', '--locked')
+    try { Run 'cargo' @('build', '--release', '--locked') } finally { Remove-Item Env:\QVT_NOTICES -ErrorAction SilentlyContinue }
+}
+
+# Starts the built executable with one argument and returns what it printed. A windowed program:
+# PowerShell does not wait for it when capturing its output, so it is waited for explicitly, its output
+# going to a file in target\.
+function Invoke-Executable([string] $exe, [string] $argument) {
+    $output = Join-Path $root "target\qvt-output-$([guid]::NewGuid().ToString('N')).txt"
+    $process = Start-Process -FilePath $exe -ArgumentList $argument -RedirectStandardOutput $output -NoNewWindow -Wait -PassThru
+    $text = Get-Content $output -Raw
+    Remove-Item $output
+    if ($process.ExitCode -ne 0) { Fail "quick-video-transcoder $argument exited $($process.ExitCode)" }
+    $text
 }
 
 # A release ships what a commit holds, so that commit must hold everything. CI checks out a commit.
@@ -173,76 +198,52 @@ function Assert-CleanTree {
     Write-Host "    clean"
 }
 
-# The zip holds four files: the executable, its readme, its licence and the third-party notices. No copy of
-# the documentation: the readme's links point at the pages of the exact commit the executable was built
-# from, which describe this build however old it gets. Next to the zip: SHA256SUMS.txt, and notes.md
+# A release is one file: quick-video-transcoder.exe, with the third-party notices and the links to its
+# documentation inside (About, --licenses, --version). Its name carries no version, so replacing the file
+# updates it and the Send to shortcut keeps working. Next to it in dist\: SHA256SUMS.txt, and notes.md
 # (the changelog section) when the version has a dated one.
 function Invoke-Package {
     $version = Get-Version
     $dist = Join-Path $root 'dist'
-    $stage = Join-Path $dist "quick-video-transcoder-$version"
     $exe = Join-Path $root 'target\release\quick-video-transcoder.exe'
 
-    # Asked of the executable rather than of git, so the readme cannot name a commit other than the one
-    # compiled in.
-    # A windowed program: PowerShell does not wait for it when capturing its output, so it is started and
-    # waited for explicitly, its output going to a file of the staging folder.
-    Step "The executable names its commit"
-    if (Test-Path $stage) { Remove-Item -Recurse -Force $stage }
-    New-Item -ItemType Directory -Force $stage | Out-Null
-    $stampFile = Join-Path $stage 'version.txt'
-    $process = Start-Process -FilePath $exe -ArgumentList '--version' -RedirectStandardOutput $stampFile -NoNewWindow -Wait -PassThru
-    $stamp = @(Get-Content $stampFile)
-    Remove-Item $stampFile
-    if ($process.ExitCode -ne 0 -or $stamp.Count -lt 3) { Fail "quick-video-transcoder --version printed: $stamp" }
-    $commit = ($stamp | Select-String -Pattern '^commit:\s+(\S+)').Matches[0].Groups[1].Value
-    $docLink = ($stamp | Select-String -Pattern '^documentation:\s+(\S+)').Matches[0].Groups[1].Value
+    # Asked of the executable rather than of git: it is what users run.
+    Step "The executable names its commit and carries its notices"
+    $stamp = Invoke-Executable $exe '--version'
+    $commit = [regex]::Match($stamp, '(?m)^commit:\s+(\S+)').Groups[1].Value
+    $docLink = [regex]::Match($stamp, '(?m)^documentation:\s+(\S+)').Groups[1].Value
     $head = (& git -C $root rev-parse HEAD).Trim()
-    if ($commit -ne $head) { Fail "the executable says commit $commit, the checkout is $head (rebuild, and commit first)" }
+    if ($commit -ne $head) { Fail "the executable says commit '$commit', the checkout is $head (rebuild, and commit first)" }
     $repository = $docLink -replace '/blob/.*$', ''
-    Write-Host "    $commit"
-
-    Step "Package $version"
-    Copy-Item $exe $stage
-    Copy-Item (Join-Path $root 'LICENSE') (Join-Path $stage 'LICENSE.txt')
-
-    # The readme, its relative links turned into links at the build's commit.
-    $base = "$repository/blob/$commit/"
-    $readme = Get-Content (Join-Path $root 'README.md') -Raw
-    $readme = [regex]::Replace($readme, '\]\((?!https?:|mailto:|#)([^)]+)\)', { param($m) '](' + $base + $m.Groups[1].Value + ')' })
-    $header = "> Quick Video Transcoder $version, built from commit $commit. Every link below shows the documentation of this exact build.`n`n"
-    Set-Content -Path (Join-Path $stage 'README.md') -Encoding utf8 -NoNewline -Value ($header + $readme)
-
-    Step "Third-party notices"
-    if (-not (Get-Command cargo-about -ErrorAction SilentlyContinue)) {
-        Fail "cargo-about is needed: cargo install cargo-about --locked --features cli"
+    $notices = Invoke-Executable $exe '--licenses'
+    if ($notices -notmatch 'SIL Open Font License' -or $notices.Length -lt 50KB) {
+        Fail "the executable carries no third-party notices (build it with build.ps1 release)"
     }
-    $notices = Join-Path $stage 'THIRD-PARTY-NOTICES.html'
-    Run 'cargo' @('about', 'generate', '--locked', '--fail', '--output-file', $notices, (Join-Path $root 'about.hbs'))
-    Write-Host "    $([math]::Round((Get-Item $notices).Length / 1KB)) KB"
+    Write-Host "    $commit, notices $([math]::Round($notices.Length / 1KB)) KB"
 
-    Step "Zip, checksum and notes"
-    $zip = Join-Path $dist "quick-video-transcoder-$version-windows-x64.zip"
-    if (Test-Path $zip) { Remove-Item -Force $zip }
-    Compress-Archive -Path (Join-Path $stage '*') -DestinationPath $zip
-    Remove-Item -Recurse -Force $stage
-    $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()
-    "$hash  $(Split-Path -Leaf $zip)" | Set-Content -NoNewline -Encoding ascii (Join-Path $dist 'SHA256SUMS.txt')
-    $notesFile = Join-Path $dist 'notes.md'
-    if (Test-Path $notesFile) { Remove-Item -Force $notesFile }
+    Step "Checksum and notes"
+    if (Test-Path $dist) { Remove-Item -Recurse -Force $dist }
+    New-Item -ItemType Directory -Force $dist | Out-Null
+    $published = Join-Path $dist 'quick-video-transcoder.exe'
+    Copy-Item $exe $published
+    $hash = (Get-FileHash $published -Algorithm SHA256).Hash.ToLowerInvariant()
+    "$hash  quick-video-transcoder.exe" | Set-Content -NoNewline -Encoding ascii (Join-Path $dist 'SHA256SUMS.txt')
     $section = Get-ChangelogSection (Get-Content (Join-Path $root 'CHANGELOG.md') -Raw) $version
     if ($section) {
-        $verify = "`n`n---`n`nBuilt from $commit. Check the download with ``gh attestation verify <zip> --repo $($repository -replace '^https://github.com/', '')``."
-        Set-Content -Path $notesFile -Encoding utf8 -NoNewline -Value ($section + $verify)
+        $slug = $repository -replace '^https://github.com/', ''
+        $footer = "`n`n---`n`nOne file, nothing to install: download ``quick-video-transcoder.exe`` and run it. It needs " +
+                  "FFmpeg, and offers to install it if it is missing. Built from $commit; documentation of this " +
+                  "version: $docLink. Check the download with ``gh attestation verify quick-video-transcoder.exe --repo $slug``."
+        Set-Content -Path (Join-Path $dist 'notes.md') -Encoding utf8 -NoNewline -Value ($section + $footer)
     }
-    Write-Host "    $zip"
+    Write-Host "    $published"
     Write-Host "    sha256 $hash"
     Write-Host "    $(if ($section) { 'notes.md from the changelog' } else { "no notes: CHANGELOG.md has no dated section for $version" })"
 }
 
 if ($Task -eq 'release') { Assert-CleanTree }
 Invoke-Tests
-if ($Task -in 'build', 'release') { Invoke-Build }
-if ($Task -eq 'release') { Invoke-Package }
+if ($Task -eq 'build') { Invoke-Build }
+if ($Task -eq 'release') { Invoke-Build -WithNotices; Invoke-Package }
 Write-Host ""
 Write-Host "$Task OK" -ForegroundColor Green

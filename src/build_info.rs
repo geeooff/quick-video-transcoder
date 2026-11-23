@@ -17,6 +17,12 @@ pub const COMMIT_SHORT: &str = env!("QVT_COMMIT_SHORT");
 /// `-dirty` when built from a tree with uncommitted changes, else empty.
 pub const DIRTY: &str = env!("QVT_DIRTY");
 
+/// The third-party notices (an HTML page): the libraries built in and their licences.
+pub const NOTICES: &str = include_str!(concat!(env!("OUT_DIR"), "/third-party-notices.html"));
+
+/// `true` when [`NOTICES`] are the generated ones, not the placeholder of a development build.
+pub const NOTICES_COMPLETE: bool = matches!(env!("QVT_NOTICES_COMPLETE").as_bytes(), b"true");
+
 /// The repository on GitHub.
 pub const REPOSITORY: &str = env!("CARGO_PKG_REPOSITORY");
 
@@ -30,7 +36,7 @@ pub fn documentation() -> String {
     doc_url("README.md")
 }
 
-/// The answer to `--version`, also what the release readme is written from: name and version, then
+/// The answer to `--version`, also what the release script checks the commit with: name and version, then
 /// `commit:` and `documentation:` lines.
 pub fn version_text() -> String {
     format!(

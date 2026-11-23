@@ -130,8 +130,8 @@ pub struct TranscoderApp {
     thumbnail_receiver: Receiver<Thumbnail>,
 
     detection: Option<Receiver<(Install, Capabilities)>>,
-    /// FFmpeg is missing or too old: the help window shows this until closed.
-    ffmpeg_problem: Option<Install>,
+    /// FFmpeg is missing or too old: the help window, until closed.
+    ffmpeg_help: Option<help::FfmpegHelp>,
     /// Files from later launches ([`crate::instance`]).
     incoming: Option<Incoming>,
     /// The *Send to* shortcut exists (checked at start and after each change).
@@ -206,7 +206,7 @@ impl TranscoderApp {
             thumbnail_sender,
             thumbnail_receiver,
             detection: Some(detection),
-            ffmpeg_problem: None,
+            ffmpeg_help: None,
             incoming,
             sendto_installed: crate::sendto::is_installed(),
             show_about: false,
@@ -387,7 +387,7 @@ impl TranscoderApp {
             )),
         }
         if !matches!(install, Install::Ready(_)) {
-            self.ffmpeg_problem = Some(install);
+            self.ffmpeg_help = Some(help::FfmpegHelp::new(install, Arc::clone(&self.notify)));
             return;
         }
         self.info(format!("hardware: {}", capabilities.summary()));
@@ -1028,6 +1028,18 @@ fn native_separators(path: PathBuf) -> PathBuf {
         Some(text) if cfg!(windows) && text.contains('/') => PathBuf::from(text.replace('/', r"\")),
         _ => path,
     }
+}
+
+/// Opens a file with its default program (the browser for a page).
+fn open_file(path: &Path) {
+    let opener = if cfg!(windows) {
+        "explorer.exe"
+    } else if cfg!(target_os = "macos") {
+        "open"
+    } else {
+        "xdg-open"
+    };
+    let _ = std::process::Command::new(opener).arg(path).spawn();
 }
 
 /// Shows a folder in Explorer, with `file` selected when given.

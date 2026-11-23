@@ -1,5 +1,6 @@
 //! The `quick-video-transcoder` executable: every argument is a video to queue (Explorer's *Send to*
-//! passes the selected files this way), except `--version`.
+//! passes the selected files this way), except `--version` and `--licenses` (the third-party notices),
+//! which print and exit.
 //!
 //! A release build has no console, so what would go to one goes to `quick-video-transcoder.log` in the
 //! data folder (the previous run's log is kept beside it), and a crash or a window that cannot open is
@@ -24,14 +25,15 @@ const PREVIOUS_LOG_FILE: &str = "quick-video-transcoder.previous.log";
 
 fn main() {
     let arguments: Vec<PathBuf> = std::env::args_os().skip(1).map(PathBuf::from).collect();
-    if arguments
-        .first()
-        .is_some_and(|a| a.as_os_str() == "--version" || a.as_os_str() == "-V")
-    {
-        // A release build has no console of its own, but a redirected output (a file, a pipe) works. A
-        // reader that already left (PowerShell does not wait for a windowed program) is no error.
-        let _ = writeln!(std::io::stdout(), "{}", build_info::version_text());
-        return;
+    // A release build has no console of its own, but a redirected output (a file, a pipe) works. A reader
+    // that already left (PowerShell does not wait for a windowed program) is no error.
+    let print = |text: &str| {
+        let _ = writeln!(std::io::stdout(), "{text}");
+    };
+    match arguments.first().and_then(|a| a.to_str()) {
+        Some("--version" | "-V") => return print(&build_info::version_text()),
+        Some("--licenses") => return print(build_info::NOTICES),
+        _ => {}
     }
     let data = profile::data_dir();
     // Before the log: a launch that only hands its files over must not rotate the open window's log.

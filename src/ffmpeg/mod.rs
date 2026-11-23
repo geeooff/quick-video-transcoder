@@ -152,6 +152,11 @@ impl Install {
     /// Runs `ffmpeg -version` and `ffprobe -version`, with the current `PATH` from the settings if the
     /// inherited one has no FFmpeg.
     pub fn check() -> Self {
+        // Debug builds: `QVT_PRETEND_NO_FFMPEG=1` shows what a machine without FFmpeg gets.
+        #[cfg(debug_assertions)]
+        if std::env::var_os("QVT_PRETEND_NO_FFMPEG").is_some() {
+            return Self::Missing("ffmpeg");
+        }
         let install = Self::check_once();
         if matches!(install, Self::Missing(_)) && refresh_path() {
             return Self::check_once();
@@ -214,6 +219,48 @@ pub fn refresh_path() -> bool {
     log::info!("FFmpeg not on the inherited PATH: using the PATH from the settings");
     *FRESH_PATH.write().unwrap_or_else(PoisonError::into_inner) = Some(path.into());
     true
+}
+
+/// The winget package of the FFmpeg build the application is tested with (gyan.dev's static full build:
+/// libplacebo, Vulkan, NVENC, Quick Sync, AMF).
+pub const WINGET_PACKAGE: &str = "Gyan.FFmpeg";
+
+/// `true` when Windows' package manager, winget, runs here.
+pub fn winget_available() -> bool {
+    cfg!(windows)
+        && tool("winget")
+            .arg("--version")
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .is_ok_and(|s| s.success())
+}
+
+/// Installs FFmpeg with winget, for the current user, accepting the package's agreements (the user asked
+/// for it from the *FFmpeg is needed* window, which says so). Takes a minute or two; the error carries
+/// winget's last lines.
+pub fn install_with_winget() -> anyhow::Result<()> {
+    use anyhow::Context;
+    let output = tool("winget")
+        .args(["install", "--id", WINGET_PACKAGE, "--exact", "--silent"])
+        .args(["--accept-package-agreements", "--accept-source-agreements"])
+        .arg("--disable-interactivity")
+        .stdin(std::process::Stdio::null())
+        .output()
+        .context("cannot start winget")?;
+    if output.status.success() {
+        return Ok(());
+    }
+    // winget redraws its progress with carriage returns: keep the last real lines.
+    let text = String::from_utf8_lossy(&output.stdout);
+    let lines: Vec<&str> = text
+        .split(['\r', '\n'])
+        .map(str::trim)
+        .filter(|l| l.chars().any(char::is_alphanumeric))
+        .collect();
+    let tail = lines[lines.len().saturating_sub(3)..].join(" / ");
+    anyhow::bail!("winget failed ({}): {tail}", output.status)
 }
 
 /// The major version in `ffmpeg -version`'s first line (`ffmpeg version 9.0.2-full_build-www.gyan.dev
