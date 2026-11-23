@@ -440,3 +440,30 @@ sendto-shortcut-description = Découper et réencoder des vidéos pour tenir dan
 
 clipboard-copy-failed = impossible de copier dans le Presse-papiers : { $detail }
 clipboard-unsupported = la copie de fichiers dans le Presse-papiers n’est prise en charge que sous Windows
+
+## Updates window (src/app/update_window.rs)
+
+menu-help-updates = Rechercher des mises à jour…
+update-title = Mises à jour
+update-running = Vous utilisez Quick Video Transcoder { $version }.
+update-check = Rechercher des mises à jour
+update-check-again = Rechercher à nouveau
+update-checking = Recherche de mises à jour…
+update-up-to-date = La version { $version } est la plus récente.
+update-available = La version { $version } est disponible
+update-download = Télécharger et installer ({ NUM($mb, decimals: 1) } Mo)
+update-release-page = Voir sur GitHub
+update-downloading = Téléchargement de la version { $version }…
+update-ready = La version { $version } est téléchargée et vérifiée. Elle s’installera au redémarrage.
+update-restart = Redémarrer maintenant
+update-wait-for-encodes = Disponible une fois les encodages terminés ou arrêtés.
+update-restarting = Installation de la version { $version } : l’application se ferme et revient…
+update-updated = Mise à jour vers la version { $version } effectuée.
+update-see-log = Détails dans le journal (Affichage > Journal).
+update-retry = Réessayer
+update-fault-connection = Impossible de joindre GitHub : pas de connexion, ou pas de réponse.
+update-fault-status = GitHub a répondu par une erreur ({ $status }). Réessayez plus tard.
+update-fault-unexpected = La réponse de GitHub ne correspond pas à ce que cette version attend. Consultez la page de la version.
+update-fault-not-verified = Le fichier téléchargé ne correspond pas au fichier publié : il a été supprimé. Réessayez.
+update-fault-cannot-write = Le dossier de cette copie n’est pas modifiable. Téléchargez plutôt la nouvelle version depuis sa page.
+update-fault-install = La mise à jour n’a pas pu être installée : { $detail }

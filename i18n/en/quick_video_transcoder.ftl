@@ -593,3 +593,43 @@ sendto-shortcut-description = Trim and re-encode videos to fit a size limit
 # Errors copying files to the clipboard. $detail: the system's message (technical).
 clipboard-copy-failed = cannot copy to the clipboard: { $detail }
 clipboard-unsupported = copying files to the clipboard is only supported on Windows
+
+## Updates window (src/app/update_window.rs)
+
+# Help menu item: opens the updates window and checks GitHub at once (the only time the app connects).
+menu-help-updates = Check for updates…
+# Title of the updates window.
+update-title = Updates
+# First line of the window. $version: the running version, like 1.0.0 (data).
+update-running = This is Quick Video Transcoder { $version }.
+update-check = Check for updates
+update-check-again = Check again
+update-checking = Checking for updates…
+# $version: the running version, which is the latest.
+update-up-to-date = { $version } is the latest version.
+# $version: the newer version found. Above the release notes (shown in English, from the changelog).
+update-available = Version { $version } is available
+# Button. $mb: the executable's size in megabytes.
+update-download = Download and install ({ NUM($mb, decimals: 1) } MB)
+# Link to the release on GitHub, in the browser.
+update-release-page = See it on GitHub
+update-downloading = Downloading { $version }…
+# Shown once the file is downloaded and its SHA-256 checked against the release's.
+update-ready = { $version } is downloaded and verified. Restarting installs it.
+update-restart = Restart now
+# Under the disabled restart button while videos are encoding (a restart would stop them).
+update-wait-for-encodes = Available once the encodes are finished or stopped.
+update-restarting = Installing { $version }: the application closes and comes back…
+# Shown at the first start after an update. $version: the new version.
+update-updated = Updated to { $version }.
+update-see-log = Details are in the log (View → Log).
+update-retry = Try again
+update-fault-connection = Could not reach GitHub: no connection, or it did not answer.
+# $status: the HTTP status GitHub answered with, like 503 (data).
+update-fault-status = GitHub answered with an error ({ $status }). Try again later.
+update-fault-unexpected = GitHub's answer was not what this version expects. See the release page.
+update-fault-not-verified = The downloaded file does not match the published one: it was deleted. Try again.
+# The executable's folder is read-only (for instance under Program Files): the user can download it by hand.
+update-fault-cannot-write = This copy's folder cannot be written. Download the new version from the release page instead.
+# $detail: why the install failed (technical, English: a Windows or PowerShell message).
+update-fault-install = The update could not be installed: { $detail }

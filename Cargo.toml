@@ -45,6 +45,11 @@ log = "0.4.34"
 rfd = "0.18.0"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
+# The updater (src/update/): SHA-256 of the downloaded executable.
+sha2 = "0.11.1"
+# The updater's HTTPS client: rustls, certificates checked against the OS's trust store (so a corporate
+# proxy's own root works), Windows' proxy settings read like a browser would.
+ureq = { version = "3.5.2", features = ["platform-verifier", "win-system-proxy"] }
 toml = "1.2.1"
 # Pseudo-localization (debug builds, QVT_PSEUDO=1): every text elongated and bracketed, to spot a text left
 # in code and a layout that cannot take a longer language.
