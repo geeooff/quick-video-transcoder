@@ -50,7 +50,7 @@ pub fn install() -> Result<PathBuf> {
                   $link.WorkingDirectory = $env:QVT_FOLDER; \
                   $link.Description = $env:QVT_DESCRIPTION; \
                   $link.Save()";
-    let output = crate::ffmpeg::tool("powershell.exe")
+    let output = crate::ffmpeg::powershell()
         .args(["-NoProfile", "-NonInteractive", "-Command", script])
         .env("QVT_LINK", &link)
         .env("QVT_TARGET", &exe)

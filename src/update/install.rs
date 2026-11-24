@@ -158,6 +158,16 @@ fn quoted(path: &Path) -> String {
 }
 
 /// The script run after this process (`pid`) exits.
+///
+/// Frozen into each release: the script a version carries is the one that installs the next, so every
+/// failure path ends with an executable in place and running (reviewed by GameModeExecutor's session,
+/// 2026-11-24):
+/// - the wait checks the process is still this program, by name (a process id can be reused);
+/// - the swap renames `exe` → `.old`, then `.new` → `exe` (retried for 30 s: OneDrive may hold a file it is
+///   uploading), then starts it;
+/// - on failure, each recovery step has its own `try`, restore first: the new file set aside (back to
+///   `.new`) if the old one was moved, the old one put back, then the restart, and `result.txt` written
+///   last, so a failure to write it never skips the restore.
 pub fn swap_script(pid: u32, paths: &Paths) -> String {
     let (exe, new, old, result) = (
         quoted(&paths.exe),
@@ -165,27 +175,49 @@ pub fn swap_script(pid: u32, paths: &Paths) -> String {
         quoted(&paths.old),
         quoted(&paths.result),
     );
+    let name = quoted(Path::new(paths.exe.file_stem().unwrap_or_default()));
     format!(
         "$ErrorActionPreference = 'Stop'
-Wait-Process -Id {pid} -Timeout 30 -ErrorAction SilentlyContinue
-function Retry([scriptblock] $Step) {{
+$exe = {exe}
+$new = {new}
+$old = {old}
+$result = {result}
+function Retry([scriptblock] $Step, [int] $Times) {{
     for ($i = 1; ; $i++) {{
-        try {{ & $Step; return }} catch {{ if ($i -ge 10) {{ throw }}; Start-Sleep -Milliseconds 500 }}
+        try {{ & $Step; return }} catch {{ if ($i -ge $Times) {{ throw }}; Start-Sleep -Milliseconds 500 }}
     }}
 }}
+function Still-Running {{
+    $process = Get-Process -Id {pid} -ErrorAction SilentlyContinue
+    $process -and $process.ProcessName -eq {name}
+}}
+if (Still-Running) {{ Wait-Process -Id {pid} -Timeout 30 -ErrorAction SilentlyContinue }}
+if (Still-Running) {{
+    try {{ Set-Content -LiteralPath $result -Value 'the application did not close' -Encoding UTF8 }} catch {{}}
+    exit 1
+}}
+$moved = $false
+$reason = $null
 try {{
-    if (Get-Process -Id {pid} -ErrorAction SilentlyContinue) {{ throw 'the application did not close' }}
-    if (Test-Path -LiteralPath {old}) {{ Retry {{ Remove-Item -LiteralPath {old} -Force }} }}
-    Retry {{ Move-Item -LiteralPath {exe} -Destination {old} -Force }}
-    Retry {{ Move-Item -LiteralPath {new} -Destination {exe} }}
-    Start-Process -FilePath {exe}
+    if (Test-Path -LiteralPath $old) {{ Retry {{ Remove-Item -LiteralPath $old -Force }} 10 }}
+    Retry {{ Move-Item -LiteralPath $exe -Destination $old -Force }} 10
+    $moved = $true
+    Retry {{ Move-Item -LiteralPath $new -Destination $exe }} 60
+    Start-Process -FilePath $exe
+    exit 0
 }} catch {{
-    Set-Content -LiteralPath {result} -Value $_.Exception.Message -Encoding UTF8
-    if (-not (Test-Path -LiteralPath {exe}) -and (Test-Path -LiteralPath {old})) {{
-        Move-Item -LiteralPath {old} -Destination {exe} -Force
-    }}
-    if (-not (Get-Process -Id {pid} -ErrorAction SilentlyContinue)) {{ Start-Process -FilePath {exe} }}
+    $reason = $_.Exception.Message
 }}
+if ($moved) {{
+    try {{
+        if (Test-Path -LiteralPath $exe) {{ Retry {{ Move-Item -LiteralPath $exe -Destination $new -Force }} 10 }}
+    }} catch {{ $reason += ' | setting the new file aside: ' + $_.Exception.Message }}
+    try {{
+        Retry {{ Move-Item -LiteralPath $old -Destination $exe -Force }} 20
+    }} catch {{ $reason += ' | restoring the previous version: ' + $_.Exception.Message }}
+}}
+try {{ Start-Process -FilePath $exe }} catch {{ $reason += ' | restarting: ' + $_.Exception.Message }}
+try {{ Set-Content -LiteralPath $result -Value $reason -Encoding UTF8 }} catch {{}}
 "
     )
 }
@@ -202,7 +234,7 @@ pub fn launch(release: &Release, paths: &Paths) -> Result<(), Fault> {
         "update: installing {}; the application closes and comes back on it",
         release.version
     );
-    crate::ffmpeg::tool("powershell.exe")
+    crate::ffmpeg::powershell()
         .args([
             "-NoProfile",
             "-NonInteractive",
@@ -393,14 +425,41 @@ mod tests {
         );
         let script = swap_script(4242, &paths);
         assert!(script.contains("Wait-Process -Id 4242 -Timeout 30"));
-        assert!(script.contains(r"-LiteralPath 'C:\It''s [a] folder\quick-video-transcoder.exe'"));
-        assert!(!script.contains("\""), "no double quote reaches PowerShell");
-        let rename = script
-            .find("-Destination 'C:\\It''s [a] folder\\quick-video-transcoder.exe.old'")
+        assert!(script.contains(r"$exe = 'C:\It''s [a] folder\quick-video-transcoder.exe'"));
+        assert!(script.contains("ProcessName -eq 'quick-video-transcoder'"));
+        assert!(!script.contains('"'), "no double quote reaches PowerShell");
+        let at = |needle: &str| script.find(needle).unwrap_or_else(|| panic!("{needle}"));
+        // The swap: old aside, new in place (30 s of retries), then started.
+        assert!(at("-Destination $old -Force } 10") < at("-Destination $exe } 60"));
+        assert!(at("-Destination $exe } 60") < at("exit 0"));
+        // The recovery: the new file aside, the old one back, the restart, the report last.
+        let aside = at("-Destination $new -Force } 10");
+        let restore = at("Move-Item -LiteralPath $old -Destination $exe -Force } 20");
+        let restart = script.rfind("Start-Process -FilePath $exe").unwrap();
+        let report = script.rfind("Set-Content -LiteralPath $result").unwrap();
+        assert!(aside < restore && restore < restart && restart < report);
+    }
+
+    /// Windows PowerShell's own parser accepts the script (it is never run here).
+    #[cfg(windows)]
+    #[test]
+    fn the_script_parses_in_windows_powershell() {
+        let paths = Paths::new(
+            Path::new(r"C:\It's [a] folder\quick-video-transcoder.exe"),
+            Path::new(r"C:\Data"),
+        );
+        let output = crate::ffmpeg::powershell()
+            .args(["-NoProfile", "-NonInteractive", "-Command"])
+            .arg("[void][ScriptBlock]::Create($env:QVT_SCRIPT); 'parsed'")
+            .env("QVT_SCRIPT", swap_script(4242, &paths))
+            .output()
             .unwrap();
-        let start = script.find("Start-Process").unwrap();
-        assert!(rename < start, "the swap happens before the restart");
-        assert!(script.contains("catch"));
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            output.status.success() && stdout.contains("parsed"),
+            "{stdout}{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
     }
 
     #[test]

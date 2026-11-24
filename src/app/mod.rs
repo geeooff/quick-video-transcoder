@@ -1211,7 +1211,7 @@ impl eframe::App for TranscoderApp {
         self.profiles_window(&ctx);
         self.about_window(&ctx);
         self.update_window(&ctx);
-        if self.close_for_update {
+        if std::mem::take(&mut self.close_for_update) {
             ctx.send_viewport_cmd(egui::ViewportCommand::Close);
         }
         self.ffmpeg_window(&ctx);
