@@ -28,17 +28,39 @@ eframe = { version = "0.37.0", features = ["persistence"] }
 # eframe; Dependabot bumps both together.
 egui = { version = "0.37.0", features = ["monochrome_emoji_fonts"] }
 env_logger = "0.11.11"
+# Localization: Project Fluent through i18n-embed (the .ftl files are embedded in the executable, and
+# `fl!` checks every message id against the English file at compile time), numbers formatted by ICU4X
+# with CLDR data compiled in, so a French "25,0 Mo" is the same on every OS. See src/i18n.rs.
+fixed_decimal = { version = "0.7.3", features = ["ryu"] }
+fluent-bundle = "0.16.0"
+i18n-embed = { version = "0.16.0", features = ["fluent-system", "desktop-requester"] }
+i18n-embed-fl = "0.10.1"
+icu_decimal = "2.4.0"
+icu_locale_core = { version = "2.4.0", features = ["alloc"] }
+# `sync`: the formatter must be Send + Sync to live in a Fluent function.
+icu_provider = { version = "2.4.0", features = ["sync"] }
+rust-embed = "8.14.0"
+unic-langid = "0.9.6"
 log = "0.4.34"
 rfd = "0.18.0"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
+# The updater (src/update/): SHA-256 of the downloaded executable.
+sha2 = "0.11.1"
+# The updater's HTTPS client: rustls, certificates checked against the OS's trust store (so a corporate
+# proxy's own root works), Windows' proxy settings read like a browser would.
+ureq = { version = "3.5.2", features = ["platform-verifier", "win-system-proxy"] }
 toml = "1.2.1"
+# Pseudo-localization (debug builds, QVT_PSEUDO=1): every text elongated and bracketed, to spot a text left
+# in code and a layout that cannot take a longer language.
+fluent-pseudo = "0.3.3"
 
 [target.'cfg(windows)'.dependencies]
 # Copies the encoded files to the clipboard as a file list (CF_HDROP), so they paste straight into a chat.
 clipboard-win = "5.4.1"
 
 [dev-dependencies]
+fluent-syntax = "0.12.0"
 tempfile = "3.27.0"
 
 [profile.dev]

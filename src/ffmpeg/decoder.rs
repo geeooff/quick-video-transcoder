@@ -114,7 +114,7 @@ impl FrameStream {
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()
-            .context("cannot start ffmpeg (is FFmpeg on the PATH?)")?;
+            .with_context(|| crate::tr!("media-ffmpeg-start-failed"))?;
         let mut stderr = StderrTail::collect(&mut child);
         let mut stdout = child.stdout.take().context("no ffmpeg stdout")?;
         let (event_tx, events) = bounded(Self::QUEUE);

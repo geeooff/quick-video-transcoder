@@ -149,14 +149,14 @@ impl Capabilities {
                 (!codecs.is_empty()).then(|| format!("{} {}", backend.label(), codecs.join("/")))
             })
             .collect();
-        format!(
-            "encoders: {}; GPU tone mapping (libplacebo): {}",
-            if pairs.is_empty() {
-                "none".to_owned()
+        crate::tr!(
+            "media-hardware-summary",
+            encoders = if pairs.is_empty() {
+                crate::tr!("media-hardware-none")
             } else {
                 pairs.join(", ")
             },
-            if self.placebo { "yes" } else { "no" }
+            placebo = if self.placebo { "yes" } else { "no" }
         )
     }
 }

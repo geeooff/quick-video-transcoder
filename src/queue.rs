@@ -404,14 +404,14 @@ impl Queue {
                     Ok((media, engine)) => {
                         log.push((
                             false,
-                            format!(
-                                "{}: {}, {}, {} audio track(s), color {}; {}",
-                                job.name(),
-                                media.summary(),
-                                crate::timecode::format_short(media.duration, true),
-                                media.audio.len(),
-                                media.color_tags,
-                                engine.label()
+                            crate::tr!(
+                                "queue-probed",
+                                name = job.name(),
+                                summary = media.summary(),
+                                duration = crate::timecode::format_short(media.duration, true),
+                                tracks = media.audio.len(),
+                                color = media.color_tags.clone(),
+                                engine = engine.label()
                             ),
                         ));
                         job.trim = Trim {
@@ -424,7 +424,14 @@ impl Queue {
                         job.changed = Instant::now() - SETTLE;
                     }
                     Err(error) => {
-                        log.push((true, format!("{}: {error}", job.name())));
+                        log.push((
+                            true,
+                            crate::tr!(
+                                "queue-job-error",
+                                name = job.name(),
+                                detail = error.clone()
+                            ),
+                        ));
                         job.phase = Phase::Unusable(error);
                     }
                 }
@@ -437,12 +444,23 @@ impl Queue {
                 if let Err(error) = &result
                     && error != "cancelled"
                 {
-                    log.push((true, format!("{}: estimate failed: {error}", job.name())));
+                    log.push((
+                        true,
+                        crate::tr!(
+                            "queue-estimate-failed",
+                            name = job.name(),
+                            detail = error.clone()
+                        ),
+                    ));
                 }
                 if job.engine != Some(engine) {
                     log.push((
                         false,
-                        format!("{}: now using {}", job.name(), engine.label()),
+                        crate::tr!(
+                            "queue-engine-changed",
+                            name = job.name(),
+                            engine = engine.label()
+                        ),
                     ));
                     job.engine = Some(engine);
                 }
@@ -473,19 +491,26 @@ impl Queue {
                     Ok(encoded) => {
                         log.push((
                             false,
-                            format!(
-                                "{}: encoded to {} ({:.2} MB in {:.1} s)",
-                                job.name(),
-                                encoded.output.display(),
-                                encoded.bytes as f64 / 1e6,
-                                encoded.elapsed.as_secs_f64()
+                            crate::tr!(
+                                "queue-encoded",
+                                name = job.name(),
+                                path = encoded.output.display().to_string(),
+                                mb = (encoded.bytes as f64 / 1e6),
+                                seconds = encoded.elapsed.as_secs_f64()
                             ),
                         ));
                         Phase::Done(encoded)
                     }
                     Err(error) if error == "cancelled" => Phase::Idle,
                     Err(error) => {
-                        log.push((true, format!("{}: encode failed: {error}", job.name())));
+                        log.push((
+                            true,
+                            crate::tr!(
+                                "queue-encode-failed",
+                                name = job.name(),
+                                detail = error.clone()
+                            ),
+                        ));
                         Phase::Failed(error)
                     }
                 };
@@ -566,8 +591,15 @@ impl Queue {
             let estimate = match job.current_estimate(Some(&key)) {
                 Some(Ok(estimate)) => *estimate,
                 Some(Err(error)) => {
-                    let message = format!("cannot encode without an estimate: {error}");
-                    log.push((true, format!("{}: {message}", job.name())));
+                    let message = crate::tr!("queue-no-estimate", detail = error.clone());
+                    log.push((
+                        true,
+                        crate::tr!(
+                            "queue-job-error",
+                            name = job.name(),
+                            detail = message.clone()
+                        ),
+                    ));
                     let job = &mut self.jobs[index];
                     job.wanted = false;
                     job.phase = Phase::Failed(message);

@@ -18,6 +18,9 @@ fn main() {
     watch_head();
     println!("cargo:rerun-if-changed=src");
     println!("cargo:rerun-if-changed=Cargo.toml");
+    // The messages are embedded and checked by `fl!` at compile time: an edited .ftl rebuilds.
+    println!("cargo:rerun-if-changed=i18n");
+    println!("cargo:rerun-if-changed=i18n.toml");
 
     let commit = git(&["rev-parse", "HEAD"]).unwrap_or_else(|| "unknown".to_owned());
     let known = commit != "unknown";

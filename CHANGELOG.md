@@ -7,6 +7,17 @@ refuses a tag without one.
 
 ## [Unreleased]
 
+### Added
+
+- The application speaks French: *View → Language* offers Automatic (the system's language), English
+  (United States, United Kingdom) and French (France, Canada, Belgium, Switzerland). It switches at once,
+  without restarting.
+- Numbers follow the chosen language and region: `25,0 Mo` in French, the Canadian and Swiss groupings,
+  `25.0 MB` in English. The size limit box accepts a comma or a point.
+- *Help → Check for updates*: shows the latest version and what changed, downloads it, checks it against
+  the published checksums, and restarts on it — the previous version comes back if anything fails. The
+  application connects only when you click.
+
 ### Fixed
 
 - *Encodes at once* is measured from 1 to 4 encodes and takes the fewest that reach the best speed: the

@@ -17,11 +17,11 @@ impl TranscoderApp {
         }
         let (Some(texture), Some(size)) = (&self.frame_texture, self.frame_size) else {
             let text = if self.queue.jobs.is_empty() {
-                "Drop game captures here, or add them with Ctrl+O"
+                crate::tr!("preview-empty-queue")
             } else if self.playing_job.is_some() {
-                "Decoding…"
+                crate::tr!("preview-decoding")
             } else {
-                "Select a video"
+                crate::tr!("preview-select-video")
             };
             painter.text(
                 area.center(),
@@ -51,27 +51,47 @@ impl TranscoderApp {
         let Some(media) = &job.media else { return };
         let mut lines = Vec::new();
         if let Some(size) = self.frame_size {
-            let mut line = format!(
-                "Preview {size} · source {}x{} {}",
-                media.width,
-                media.height,
-                codec_label(&media.codec)
-            );
-            if media.dynamic.is_hdr() {
-                let shown = if job.profile.sdr_only {
-                    "tone mapped as encoded"
-                } else {
-                    "kept HDR, shown tone mapped"
-                };
-                line.push_str(&format!(" · {} {shown}", media.dynamic.label()));
-            }
+            let size = size.to_string();
+            let width = media.width.to_string();
+            let height = media.height.to_string();
+            let codec = codec_label(&media.codec);
+            let line = if !media.dynamic.is_hdr() {
+                crate::tr!(
+                    "preview-info",
+                    size = size,
+                    width = width,
+                    height = height,
+                    codec = codec
+                )
+            } else if job.profile.sdr_only {
+                crate::tr!(
+                    "preview-info-hdr-encoded",
+                    size = size,
+                    width = width,
+                    height = height,
+                    codec = codec,
+                    dynamic = media.dynamic.label()
+                )
+            } else {
+                crate::tr!(
+                    "preview-info-hdr-kept",
+                    size = size,
+                    width = width,
+                    height = height,
+                    codec = codec,
+                    dynamic = media.dynamic.label()
+                )
+            };
             lines.push(line);
         }
         if self.player.is_loading() {
-            lines.push("Seeking…".to_owned());
+            lines.push(crate::tr!("preview-seeking"));
         }
         if let Some(error) = self.player.error() {
-            lines.push(format!("Decoder: {error}"));
+            lines.push(crate::tr!(
+                "preview-decoder-error",
+                detail = error.to_string()
+            ));
         }
         let font = FontId::monospace(12.5);
         let mut pos = area.left_top() + vec2(10.0, 8.0);

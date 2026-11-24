@@ -54,18 +54,28 @@ tests/pipeline.rs   end to end on synthetic clips          examples/transcode.rs
 - Spawn FFmpeg with `ffmpeg::tool()` or `background_tool()` (no console window); collect stderr with
   `StderrTail::finish()` after exit; stop with `kill_tree` (Chocolatey and Scoop shims).
 - Never hard-code an encoder: go through `Capabilities::encoder`. H.265 stays the default codec.
+- The network is used only when the user clicks *Check for updates* (docs/updating.md): never a
+  background check. Updater tests never call GitHub (scripted feed, local listener).
+- Every text a user reads is a Fluent message: `crate::tr!("id")`, numbers through `NUM` in the message
+  (docs/localization.md). Logs and technical details stay in English.
 - Qualities are H.265 QPs everywhere; `EncoderSpec::qp` converts for AV1 scales.
 - Module doc comments carry the rules a module is shaped by: read them first, update them with the rule.
 - The cpal callback is real time: short locks, no I/O, never wait on a decoder.
 - egui: `lost_focus()` lasts two frames, apply a text field only if the user typed in it (`time_edit`);
   sliders use `SliderClamping::Edits`. Some symbols are missing from egui's fonts (arrows, most emoji): check
   a screenshot after adding one.
+- `QVT_PSEUDO=1` and `QVT_LANGUAGE=fr-CA` (debug builds) pseudo-localize or force a language for
+  screenshots (docs/localization.md).
 - `QVT_PRETEND_NO_FFMPEG=1` (debug builds) shows the *FFmpeg is needed* window without uninstalling
   FFmpeg. Never click *Install FFmpeg for me* while testing: it really runs winget.
 - Checking the UI without driving it: `QVT_SCREENSHOT=<file.ppm>` saves the window once the queue is
   estimated and the preview shows a frame, then quits. Run it on synthetic clips in a scratch folder.
 
 ## Workflow
+
+Project skills in `.claude/skills/`: **release**, **install-locally**, **upgrade-dependencies**, **localize** —
+the procedures this repository repeats, with their pitfalls. Use them; update them when a procedure changes.
+
 
 ```powershell
 .\scripts\build.ps1            # fmt, clippy -D warnings, rustdoc -D warnings, tests, doc links, no video / personal path

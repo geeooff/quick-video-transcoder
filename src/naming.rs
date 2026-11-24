@@ -80,13 +80,16 @@ pub fn check_partial(partial: &Path, output: &Path, source: &Path) -> Result<()>
         .extension()
         .is_some_and(|e| e.eq_ignore_ascii_case(PARTIAL_EXTENSION));
     if !marked || partial != partial_path(output) || partial.parent() != output.parent() {
-        bail!(
-            "refusing to write {}: not a partial file",
-            partial.display()
-        );
+        bail!(crate::tr!(
+            "encode-refuse-partial",
+            path = partial.display().to_string()
+        ));
     }
     if same_file(partial, source) || same_file(output, source) {
-        bail!("refusing to write over the source {}", source.display());
+        bail!(crate::tr!(
+            "encode-refuse-source",
+            path = source.display().to_string()
+        ));
     }
     Ok(())
 }

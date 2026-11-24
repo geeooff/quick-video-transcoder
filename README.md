@@ -25,6 +25,9 @@ and any video FFmpeg reads.
 - **HDR to SDR done right.** An HDR capture is tone mapped on the GPU by libplacebo, with peak detection
   and gamut mapping, and the preview shows it exactly as it will be encoded.
 - **Ready to paste.** *Copy* puts the encoded file on the clipboard: paste it into the conversation.
+- **English and French.** It follows the system's language, or the one chosen in *View → Language*,
+  regional variants included (French of France, Canada, Belgium, Switzerland; US and UK English), numbers
+  formatted as that region writes them.
 
 Nothing is ever overwritten: an output name that exists gets ` (2)`, and the source is only read.
 
@@ -72,6 +75,14 @@ window opens: videos sent while it is open join its queue.
 
 Keyboard shortcuts are under *Help*, with *About* (the version, and this documentation as it was for
 that version).
+
+## Updating
+
+*Help → Check for updates* looks for a newer version on GitHub (the only time the application
+connects), shows what changed, and on request downloads it, checks it against the release's published
+checksums and restarts on it; if the new file cannot be put in place, the previous version comes back.
+The program's folder must be writable (not Program Files): otherwise download the new file from the
+release page and replace it by hand. How it works: [Updating](docs/updating.md).
 
 ## When something goes wrong
 
@@ -121,6 +132,8 @@ for what is documented and how to measure it.
 | --- | --- |
 | [Messenger's limits](docs/messenger.md) | What Meta documents, and how to measure the rest. |
 | [Discord's limits](docs/discord.md) | Upload limits with and without Nitro, formats, the Discord profiles. |
+| [Localization](docs/localization.md) | How texts are translated, the glossary, adding a language. |
+| [Updating](docs/updating.md) | How the application updates itself, what it trusts, the measurements. |
 | [Architecture](docs/architecture.md) | How the size fitting, the filters and the preview work, with measurements. |
 | [Changelog](CHANGELOG.md) | What each release changed. |
 | [Contributing](CONTRIBUTING.md) | Building, testing, rules. |
