@@ -7,6 +7,10 @@ refuses a tag without one.
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-11-24
+
+The application in French, and updates from within it.
+
 ### Added
 
 - The application speaks French: *View → Language* offers Automatic (the system's language), English
@@ -73,5 +77,6 @@ The first release.
 - One file, nothing to install: the release is `quick-video-transcoder.exe` alone, the C runtime and the
   third-party licences inside (*Help → About*). Replacing the file updates it.
 
-[Unreleased]: https://github.com/Geeooff/quick-video-transcoder/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/Geeooff/quick-video-transcoder/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/Geeooff/quick-video-transcoder/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/Geeooff/quick-video-transcoder/releases/tag/v1.0.0

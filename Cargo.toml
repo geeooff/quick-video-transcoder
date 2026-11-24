@@ -1,6 +1,6 @@
 [package]
 name = "quick-video-transcoder"
-version = "1.0.0"
+version = "1.1.0"
 authors = ["Geoffrey Vancoetsem"]
 edition = "2024"
 # egui 0.37 needs Rust 1.95.
