@@ -467,3 +467,14 @@ update-fault-unexpected = La réponse de GitHub ne correspond pas à ce que cett
 update-fault-not-verified = Le fichier téléchargé ne correspond pas au fichier publié : il a été supprimé. Réessayez.
 update-fault-cannot-write = Le dossier de cette copie n’est pas modifiable. Téléchargez plutôt la nouvelle version depuis sa page.
 update-fault-install = La mise à jour n’a pas pu être installée : { $detail }
+update-fault-rate-limited =
+    GitHub limite les vérifications à 60 par heure et par connexion Internet, et cette limite est atteinte. Réessayez dans { $minutes ->
+        [one] { NUM($minutes) } minute
+       *[other] { NUM($minutes) } minutes
+    }.
+update-fault-rate-limited-later = GitHub limite les vérifications à 60 par heure et par connexion Internet, et cette limite est atteinte. Réessayez plus tard.
+update-queue-cleared =
+    Le redémarrage vide la file d’attente ({ $count ->
+        [one] { NUM($count) } vidéo
+       *[other] { NUM($count) } vidéos
+    }) : les découpes et réglages ne sont pas conservés.

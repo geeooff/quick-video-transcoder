@@ -633,3 +633,17 @@ update-fault-not-verified = The downloaded file does not match the published one
 update-fault-cannot-write = This copy's folder cannot be written. Download the new version from the release page instead.
 # $detail: why the install failed (technical, English: a Windows or PowerShell message).
 update-fault-install = The update could not be installed: { $detail }
+# GitHub refused because its hourly limit (60 checks per internet connection, shared by everyone on it) is
+# reached. $minutes: minutes until it resets.
+update-fault-rate-limited =
+    GitHub limits checks to 60 an hour per internet connection, and that limit is reached. Try again in { $minutes ->
+        [one] { NUM($minutes) } minute
+       *[other] { NUM($minutes) } minutes
+    }.
+update-fault-rate-limited-later = GitHub limits checks to 60 an hour per internet connection, and that limit is reached. Try again later.
+# Under Restart now when videos are in the queue: the queue is not kept across the restart.
+update-queue-cleared =
+    Restarting clears the queue ({ $count ->
+        [one] { NUM($count) } video
+       *[other] { NUM($count) } videos
+    }): their trims and settings are not kept.

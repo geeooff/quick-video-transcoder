@@ -83,6 +83,9 @@ pub enum Fault {
     NoConnection(String),
     /// GitHub answered with this HTTP status.
     Status(u16),
+    /// GitHub's limit of 60 unauthenticated requests an hour per IP address is reached (shared by
+    /// everyone behind the same address); minutes until it resets, when GitHub says.
+    RateLimited(Option<u64>),
     /// An answer this version does not understand (no such asset, a tag not `vX.Y.Z`, not JSON…).
     Unexpected(String),
     /// The downloaded file's SHA-256 is not the published one.

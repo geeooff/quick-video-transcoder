@@ -152,6 +152,7 @@ impl TranscoderApp {
         let mut open = true;
         let mut event = None;
         let encoding = self.encoding();
+        let queued = self.queue.jobs.len();
         let phase = self.updater.machine.phase().clone();
         egui::Window::new(crate::tr!("update-title"))
             .id(egui::Id::unique("update window"))
@@ -166,7 +167,7 @@ impl TranscoderApp {
                     version = running_version().to_string()
                 ));
                 ui.add_space(8.0);
-                event = phase_ui(ui, &phase, encoding);
+                event = phase_ui(ui, &phase, encoding, queued);
             });
         if let Some(event) = event {
             self.send_update(event);
@@ -179,7 +180,7 @@ impl TranscoderApp {
 }
 
 /// The body of the window for a phase; returns the event a button sent.
-fn phase_ui(ui: &mut egui::Ui, phase: &Phase, encoding: bool) -> Option<Event> {
+fn phase_ui(ui: &mut egui::Ui, phase: &Phase, encoding: bool, queued: usize) -> Option<Event> {
     let mut event = None;
     match phase {
         Phase::Idle => {
@@ -242,6 +243,16 @@ fn phase_ui(ui: &mut egui::Ui, phase: &Phase, encoding: bool) -> Option<Event> {
                     egui::RichText::new(crate::tr!("update-wait-for-encodes"))
                         .small()
                         .weak(),
+                );
+            } else if queued > 0 {
+                // The queue lives in memory only: trims and settings of queued videos are not kept.
+                ui.label(
+                    egui::RichText::new(crate::tr!(
+                        "update-queue-cleared",
+                        count = (queued as f64)
+                    ))
+                    .small()
+                    .color(ui.visuals().warn_fg_color),
                 );
             }
             if restart.clicked() {
@@ -355,6 +366,10 @@ fn fault_text(fault: &Fault) -> String {
     match fault {
         Fault::NoConnection(_) => crate::tr!("update-fault-connection"),
         Fault::Status(status) => crate::tr!("update-fault-status", status = status.to_string()),
+        Fault::RateLimited(Some(minutes)) => {
+            crate::tr!("update-fault-rate-limited", minutes = (*minutes as f64))
+        }
+        Fault::RateLimited(None) => crate::tr!("update-fault-rate-limited-later"),
         Fault::Unexpected(_) => crate::tr!("update-fault-unexpected"),
         Fault::NotVerified => crate::tr!("update-fault-not-verified"),
         Fault::CannotWrite(_) => crate::tr!("update-fault-cannot-write"),

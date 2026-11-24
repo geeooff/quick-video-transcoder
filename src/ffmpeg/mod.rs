@@ -32,6 +32,29 @@ const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 /// The `PATH` read from the settings by [`refresh_path`], when the inherited one lacks FFmpeg.
 static FRESH_PATH: RwLock<Option<OsString>> = RwLock::new(None);
 
+/// Windows PowerShell by its absolute path, without a console window. Never looked up by name: Windows
+/// searches the application's own folder before System32, so a `powershell.exe` dropped beside this
+/// executable (a Downloads folder) would run instead (found in review, 2026-11-24).
+pub fn powershell() -> Command {
+    let root = std::env::var_os("SystemRoot").unwrap_or_else(|| "C:\\Windows".into());
+    let path = std::path::Path::new(&root)
+        .join("System32")
+        .join("WindowsPowerShell")
+        .join("v1.0")
+        .join("powershell.exe");
+    tool(&path.to_string_lossy())
+}
+
+/// winget by its absolute path (the App Installer's alias in the user's WindowsApps folder), for the
+/// same reason as [`powershell`]. `None` when it is not installed.
+fn winget() -> Option<Command> {
+    let path = std::path::Path::new(&std::env::var_os("LOCALAPPDATA")?)
+        .join("Microsoft")
+        .join("WindowsApps")
+        .join("winget.exe");
+    path.exists().then(|| tool(&path.to_string_lossy()))
+}
+
 /// A [`Command`] for an FFmpeg tool that does not open a console window on Windows.
 pub fn tool(program: &str) -> Command {
     let mut command = Command::new(program);
@@ -204,7 +227,7 @@ pub fn refresh_path() -> bool {
         "[Environment]::GetEnvironmentVariable('Path', 'Machine') + ';' + ",
         "[Environment]::GetEnvironmentVariable('Path', 'User')"
     );
-    let Ok(output) = tool("powershell.exe")
+    let Ok(output) = powershell()
         .args(["-NoProfile", "-NonInteractive", "-Command", script])
         .stdin(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
@@ -227,14 +250,15 @@ pub const WINGET_PACKAGE: &str = "Gyan.FFmpeg";
 
 /// `true` when Windows' package manager, winget, runs here.
 pub fn winget_available() -> bool {
-    cfg!(windows)
-        && tool("winget")
+    winget().is_some_and(|mut winget| {
+        winget
             .arg("--version")
             .stdin(std::process::Stdio::null())
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::null())
             .status()
             .is_ok_and(|s| s.success())
+    })
 }
 
 /// Installs FFmpeg with winget, for the current user, accepting the package's agreements (the user asked
@@ -242,7 +266,8 @@ pub fn winget_available() -> bool {
 /// winget's last lines.
 pub fn install_with_winget() -> anyhow::Result<()> {
     use anyhow::Context;
-    let output = tool("winget")
+    let output = winget()
+        .with_context(|| crate::tr!("media-winget-start-failed"))?
         .args(["install", "--id", WINGET_PACKAGE, "--exact", "--silent"])
         .args(["--accept-package-agreements", "--accept-source-agreements"])
         .arg("--disable-interactivity")

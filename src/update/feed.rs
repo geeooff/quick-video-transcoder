@@ -90,11 +90,25 @@ impl GitHub {
             .map_err(|error| Fault::NoConnection(error.to_string()))?;
         let status = response.status().as_u16();
         if status == 200 {
-            Ok(response)
-        } else {
-            log::warn!("update: {url} answered {status}");
-            Err(Fault::Status(status))
+            return Ok(response);
         }
+        log::warn!("update: {url} answered {status}");
+        let header = |name: &str| {
+            response
+                .headers()
+                .get(name)
+                .and_then(|v| v.to_str().ok())
+                .and_then(|v| v.trim().parse::<u64>().ok())
+        };
+        if matches!(status, 403 | 429) && header("x-ratelimit-remaining") == Some(0) {
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map_or(0, |d| d.as_secs());
+            let minutes =
+                header("x-ratelimit-reset").map(|reset| reset.saturating_sub(now).div_ceil(60));
+            return Err(Fault::RateLimited(minutes));
+        }
+        Err(Fault::Status(status))
     }
 }
 
@@ -257,12 +271,13 @@ mod tests {
         ));
     }
 
-    /// A one-shot HTTP server on 127.0.0.1 answering each request with the next canned response.
-    fn serve(responses: Vec<(u16, String)>) -> String {
+    /// A one-shot HTTP server on 127.0.0.1 answering each request with the next canned response
+    /// (status, extra headers, body).
+    fn serve_with(responses: Vec<(u16, &'static str, String)>) -> String {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let address = listener.local_addr().unwrap();
         std::thread::spawn(move || {
-            for (status, body) in responses {
+            for (status, headers, body) in responses {
                 let Ok((mut stream, _)) = listener.accept() else {
                     return;
                 };
@@ -273,12 +288,31 @@ mod tests {
                 }
                 let _ = write!(
                     stream,
-                    "HTTP/1.1 {status} X\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                    "HTTP/1.1 {status} X\r\n{headers}Content-Length: {}\r\nConnection: close\r\n\r\n{body}",
                     body.len()
                 );
             }
         });
         format!("http://{address}")
+    }
+
+    fn serve(responses: Vec<(u16, String)>) -> String {
+        serve_with(responses.into_iter().map(|(s, b)| (s, "", b)).collect())
+    }
+
+    #[test]
+    fn says_when_the_hourly_limit_is_reached() {
+        let base = serve_with(vec![
+            (
+                403,
+                "x-ratelimit-remaining: 0\r\nx-ratelimit-reset: 1\r\n",
+                "{}".to_owned(),
+            ),
+            (403, "x-ratelimit-remaining: 12\r\n", "{}".to_owned()),
+        ]);
+        let feed = GitHub::with_api(&base, "o/r");
+        assert_eq!(feed.latest(), Err(Fault::RateLimited(Some(0))));
+        assert_eq!(feed.latest(), Err(Fault::Status(403)));
     }
 
     #[test]
